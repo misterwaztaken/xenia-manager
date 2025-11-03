@@ -1,21 +1,7 @@
 {
-  "installed_emulators": {
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "9132035",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "2.3.0",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\stable\\v1.0.2825-master\\xenia.exe": "v1.0.2825-master",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia-canary-dbexperiment_2.3.0.exe": "Legacy Install",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia.exe": "Legacy Install",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Legacy Install",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\8197881\\xenia_canary.exe": "8197881"
-  },
+  "installed_emulators": {},
   "emulator": {
     "fullscreen": false
   },
-  "emulators": {
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "Xenia Canary 9132035",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "Xenia Canary (db-experiment) 2.3.0",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\stable\\v1.0.2825-master\\xenia.exe": "Xenia v1.0.2825-master",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Xenia Canary",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\8197881\\xenia_canary.exe": "Xenia Canary 8197881"
-  }
+  "emulators": {}
 }
