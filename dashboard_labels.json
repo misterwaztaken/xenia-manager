@@ -17,7 +17,12 @@
     "2009.06 - NXE (2.0.7371.32)": "Works",
     "2007.12.04 - Blades (2.0.6683.0)": "Works"
   },
-  "emulators": {},
+  "emulators": {
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "Xenia Canary",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "Xenia Canary",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\stable\\v1.0.2825-master\\xenia.exe": "Xenia",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Xenia Canary"
+  },
   "games": [],
   "settings": {
     "dashboard_folders": [],
@@ -27,14 +32,12 @@
     "fullscreen": true
   },
   "installed_emulators": {
-    "c:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\xenia.exe": "9132035",
-    "c:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\xenia_canary.exe": "9132035",
-    "C:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\xenia_canary.exe": "Unknown",
-    "C:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\xenia.exe": "Unknown",
-    "C:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\xenia_canary_netplay.exe": "Unknown",
-    "c:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\xenia_canary_netplay.exe": "Legacy Install",
-    "c:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\versions\\stable\\v1.0.2825-master\\xenia.exe": "v1.0.2825-master",
-    "c:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\versions\\canary\\9132035\\xenia_canary.exe": "9132035",
-    "c:\\Users\\AlexK\\OneDrive\\Desktop\\xeniamanager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "2.3.0"
-  }
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "9132035",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "2.3.0",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\stable\\v1.0.2825-master\\xenia.exe": "v1.0.2825-master",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia-canary-dbexperiment_2.3.0.exe": "Legacy Install",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia.exe": "Legacy Install",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Legacy Install"
+  },
+  "versions": {}
 }

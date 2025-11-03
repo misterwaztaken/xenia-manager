@@ -371,6 +371,8 @@ def update_xenia(emulator, version=None):
                     ems = state.setdefault('emulators', {})
                     if ap not in ems:
                         ems[ap] = 'Xenia Canary' if 'canary' in fn.lower() or 'canary' in emulator else 'Xenia'
+                        # add the version if we can
+                        state['emulators'] = ems
                     detected.append((ap, tag))
             # persist state if we detected anything
             if detected:
@@ -1021,7 +1023,11 @@ def open_manager_config():
             
             is_versioned = '/versions/' in path.replace('\\', '/')
             if is_versioned:
-                variant = 'Canary' if 'canary' in path.lower() else 'Stable'
+                # add in db-experiment if applicable
+                if 'dbexperiment' in path.lower() or 'db-experiment' in path.lower():
+                    variant = 'Canary (db-experiment)'
+                else:
+                    variant = 'Canary' if 'canary' in path.lower() else 'Stable'
                 version_key = f"{variant} {version}"
             else:
                 version_key = 'Legacy Installations'
@@ -1239,7 +1245,7 @@ settings_menu.add_command(label="Configure Emulator...", command=configure_emula
 menubar.add_cascade(label="Settings", menu=settings_menu)
 
 help_menu = tk.Menu(menubar, tearoff=0)
-help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Xenia Manager — Dashboard & Games Manager"))
+help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Xenia Manager\nVersion 0.1\n\nA simple manager for Xenia Xbox 360 emulator dashboards and games.\n\nDeveloped by kazwaztaken."))
 menubar.add_cascade(label="Help", menu=help_menu)
 
 root.config(menu=menubar)
