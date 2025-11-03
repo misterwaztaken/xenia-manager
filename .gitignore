@@ -1,2 +1,9 @@
-        games/
-        dashboard_labels.json
+games/
+dashboard_labels.json
+dist/
+dashboard/
+cache/
+cache0/
+cache1/
+temp/
+versions/

@@ -2,7 +2,9 @@ import tkinter as tk
 from PIL import Image, ImageTk
 from tkinter import ttk, messagebox, filedialog, simpledialog, PhotoImage
 import os
+import threading
 import json
+import io
 import subprocess
 import zipfile
 import sys
@@ -17,9 +19,37 @@ try:
 except Exception:
     HAVE_TKDN = False
 
+# Define the utility function outside of update_xenia()
+def get_app_root_dir(): # this is important for the pyinstaller temp folder handling
+    """Returns the directory where the main executable or script is located."""
+    if getattr(sys, 'frozen', False):
+        # Running from PyInstaller .exe
+        return os.path.dirname(sys.executable)
+    else:
+        # Running from a normal Python script
+        return os.path.dirname(os.path.abspath(__file__))
+
+# Define the absolute path for the 'temp' folder 
+APP_ROOT_DIR = get_app_root_dir()
+TEMP_DIR = os.path.join(APP_ROOT_DIR, "temp") # oray that this works
+
+# helper function to get asset paths
+def get_asset_path(filename):
+    """Generates the correct path to an asset, handling both development and PyInstaller modes."""
+    # Check if the code is running from a PyInstaller bundle
+    if getattr(sys, 'frozen', False):
+        # The temporary directory where PyInstaller extracts files
+        base_path = sys._MEIPASS
+    else:
+        # Standard development mode
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    return os.path.join(base_path, 'assets', filename)
+
+
 # File to store labels (placed in parent folder of the "Xbox 360 Dashboards" folder)
 def get_labels_path():
-    dash_folder = os.path.abspath("Xbox 360 Dashboards")
+    dash_folder = os.path.abspath("dashboard")
     if os.path.exists(dash_folder):
         parent = os.path.dirname(dash_folder)
     else:
@@ -44,7 +74,7 @@ def add_dashboard():
     name = simpledialog.askstring("New Dashboard", "Enter folder name for new dashboard:")
     if not name:
         return
-    dash_dir = os.path.join("Xbox 360 Dashboards", name)
+    dash_dir = os.path.join("dashboard", name)
     if ensure_dir(dash_dir):
         messagebox.showinfo("Created", f"Created dashboard folder: {name}")
         refresh_trees()
@@ -57,7 +87,7 @@ def import_dashboard():
     name = simpledialog.askstring("Import Dashboard", "Enter folder name to import into (will be created):")
     if not name:
         return
-    dash_dir = os.path.join("Xbox 360 Dashboards", name)
+    dash_dir = os.path.join("dashboard", name)
     if not ensure_dir(dash_dir):
         return
     for p in paths:
@@ -125,6 +155,7 @@ def update_xenia(emulator, version=None):
     popup.title(f"{emulator} Update")
     popup.geometry("400x150")
     
+    temp_dir = os.path.join(os.path.dirname(__file__), TEMP_DIR)
     # Create and pack widgets
     status_var = tk.StringVar(value="Preparing update...")
     progress_var = tk.StringVar(value="")
@@ -270,13 +301,13 @@ def update_xenia(emulator, version=None):
         if not download_url:
             raise Exception("No Windows release found")
             
-        # Create temp directory
+        # Create temp directory using the absolute path next to the executable
         update_status("Downloading update...")
-        os.makedirs("temp", exist_ok=True)
-        if not REPO == "xenia-canary" and not OWNER == "seven7000real": # exe releases are not zips     
-            zip_path = os.path.join("temp", f"{emulator}_{version or 'latest'}.zip")
+        os.makedirs(TEMP_DIR, exist_ok=True) 
+        if not REPO == "xenia-canary" and not OWNER == "seven7000real": 
+            zip_path = os.path.join(TEMP_DIR, f"{emulator}_{version or 'latest'}.zip")
         else:
-            zip_path = os.path.join("temp", f"{emulator}_{version or 'latest'}.exe")
+            zip_path = os.path.join(TEMP_DIR, f"{emulator}_{version or 'latest'}.exe")
         # Download with progress tracking
         download_with_progress(download_url, zip_path)
         
@@ -297,9 +328,10 @@ def update_xenia(emulator, version=None):
             exe_filename = os.path.basename(zip_path) # xenia_canary-dbexperiment_*.exe
         else:
             # Extract the zip for all other cases
+            update_extract_dir = os.path.join(TEMP_DIR, "xenia_update")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall("temp/xenia_update")
-            src_dir = os.path.join("temp", "xenia_update")
+                zip_ref.extractall(update_extract_dir) # Use absolute path
+            src_dir = update_extract_dir
             
         # Copy files to version-specific directory
         update_progress(50, "Copying files...")
@@ -307,7 +339,7 @@ def update_xenia(emulator, version=None):
         dest_dir = get_version_dir(emulator, version_tag)
         os.makedirs(dest_dir, exist_ok=True)
         
-        src_dir = os.path.join("temp", "xenia_update")
+        src_dir = os.path.join(TEMP_DIR, "xenia_update")
         
         # Clean existing version directory
         for item in os.listdir(dest_dir):
@@ -370,7 +402,14 @@ def update_xenia(emulator, version=None):
                     # also ensure emulators mapping has a friendly name
                     ems = state.setdefault('emulators', {})
                     if ap not in ems:
-                        ems[ap] = 'Xenia Canary' if 'canary' in fn.lower() or 'canary' in emulator else 'Xenia'
+                        # if it is actually db-experiment, mark it as such
+                        emulator = fn
+                        if 'dbexperiment' in fn.lower() or 'db-experiment' in emulator:
+                            ems[ap] = 'Xenia Canary (db-experiment)'
+                        else:
+                            ems[ap] = 'Xenia Canary' if 'canary' in fn.lower() or 'canary' in emulator else 'Xenia'
+                        # also, append version to name if possible
+                        ems[ap] += f" {tag}"
                         # add the version if we can
                         state['emulators'] = ems
                     detected.append((ap, tag))
@@ -383,10 +422,11 @@ def update_xenia(emulator, version=None):
         # Clean up
         update_status("Cleaning up...")
         update_progress(90, "Removing temporary files...")
-        
+        update_extract_dir = os.path.join(TEMP_DIR, "xenia_update") # Must redefine for this block if not global
         if not is_exe_download:
-            shutil.rmtree("temp/xenia_update", ignore_errors=True)
+            shutil.rmtree(update_extract_dir, ignore_errors=True)  
             
+        # cleanup for zip_path  
         try:
             if os.path.exists(zip_path):
                 os.remove(zip_path)
@@ -411,7 +451,7 @@ def update_xenia(emulator, version=None):
         # Clean up temp files if they exist
         try:
             if not is_exe_download:
-                shutil.rmtree("temp/xenia_update", ignore_errors=True)
+                shutil.rmtree(os.path.join(temp_dir, "xenia_update"), ignore_errors=True)
             if 'zip_path' in locals() and os.path.exists(zip_path):
                  os.remove(zip_path)
         except Exception:
@@ -441,8 +481,8 @@ def update_xenia(emulator, version=None):
             raise Exception("No Windows release found")
             
         # Create temp directory if it doesn't exist
-        os.makedirs("temp", exist_ok=True)
-        zip_path = os.path.join("temp", f"{emulator}_{version or 'latest'}.zip")
+        os.makedirs(TEMP_DIR, exist_ok=True)
+        zip_path = os.path.join(TEMP_DIR, f"{emulator}_{version or 'latest'}.zip")
         
         # Download with progress
         response = requests.get(download_url, stream=True)
@@ -464,11 +504,11 @@ def update_xenia(emulator, version=None):
         
       
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall("temp/xenia_update")
+            zip_ref.extractall(os.path.join(temp_dir, "xenia_update"))
             
         # Copy files to main directory
         dest_dir = os.path.abspath(os.path.dirname(__file__))
-        src_dir = os.path.join("temp", "xenia_update")
+        src_dir = os.path.join(TEMP_DIR, "xenia_update")
         
         for root, dirs, files in os.walk(src_dir):
             for file in files:
@@ -479,7 +519,7 @@ def update_xenia(emulator, version=None):
                 shutil.copy2(src_path, dest_path)
         
         # Clean up
-        shutil.rmtree("temp/xenia_update", ignore_errors=True)
+        shutil.rmtree(os.path.join(temp_dir, "xenia_update"), ignore_errors=True)
         os.remove(zip_path)
         
         status_label.config(text="Update complete!")
@@ -491,7 +531,7 @@ def update_xenia(emulator, version=None):
         messagebox.showerror("Error", f"Failed to update {emulator}: {str(e)}")
         popup.destroy()
 
-        os.makedirs("temp", exist_ok=True)
+        os.makedirs(TEMP_DIR, exist_ok=True)
         releases_url = f"https://api.github.com/repos/{OWNER}/{REPO}/releases/latest"
 
         response = requests.get(releases_url)
@@ -513,7 +553,7 @@ def update_xenia(emulator, version=None):
             if asset["name"].endswith(".zip") and asset["name"].startswith("xenia_canary_windows"):
                 asset_url = asset["browser_download_url"]
                 file_name = asset["name"]
-                download_path = pathlib.Path("temp") / file_name
+                download_path = pathlib.Path(TEMP_DIR) / file_name
 
                 print(f"Downloading {file_name}...") #TODO: make this a pop-up loader
                 updatelabel = tk.Label(popup, text="Downloading Xenia Canary Update, please wait...").pack(padx=20, pady=20)
@@ -609,7 +649,7 @@ def import_dashboards_menu():
         name = simpledialog.askstring("Import Dashboard", "Enter folder name to import into (will be created):")
         if not name:
             return
-        dash_dir = os.path.join("Xbox 360 Dashboards", name)
+        dash_dir = os.path.join("dashboard", name)
         if not ensure_dir(dash_dir):
             return
         for p in paths:
@@ -702,7 +742,7 @@ def open_manager_config():
 
     # Dashboard Folders tab - core configuration of which folders contain dashboard files
     folders_frame = ttk.Frame(nb)
-    nb.add(folders_frame, text='Dashboard Folders')
+    nb.add(folders_frame, text='Dashboards')
 
     folders_list = tk.Listbox(folders_frame, width=100, height=15)
     folders_list.pack(side='left', fill='both', expand=True, padx=(6,0), pady=6)
@@ -715,8 +755,8 @@ def open_manager_config():
         # Local root dashboard folders
         folders_list.insert(tk.END, '--- Local Dashboard Folders ---')
         # Default folder is always first
-        if os.path.isdir('Xbox 360 Dashboards'):
-            folders_list.insert(tk.END, 'Xbox 360 Dashboards [Default]')
+        if os.path.isdir('dashboard'):
+            folders_list.insert(tk.END, 'dashboard [Default]')
         # Additional configured folders from state
         for folder in state.get('settings', {}).get('dashboard_folders', []):
             if os.path.isdir(folder):
@@ -808,7 +848,8 @@ def open_manager_config():
     ttk.Button(btn_frame, image=plus_icon, text='Add Folder...', command=add_folder).pack(side='left', padx=6)
     ttk.Button(btn_frame, image=minus_icon, text='Remove Selected', command=remove_folder).pack(side='left', padx=6)
     ttk.Button(btn_frame, image=open_folder_icon, text='Open Folder', command=open_selected).pack(side='left', padx=6)
-
+    # add new dashboard install button
+    ttk.Button(btn_frame, text='Install a Dashboard...', command=dashboard_installer).pack(side='left', padx=6)
     # General tab for simple settings
     gen_frame = ttk.Frame(nb)
     nb.add(gen_frame, text='General')
@@ -1103,7 +1144,6 @@ def open_manager_config():
     ttk.Button(btns, text='Detect Installed Emulators', command=detect_and_refresh).pack(side='left', padx=6)
     ttk.Button(btns, text='Open Folder', command=open_selected_emulator_folder).pack(side='left', padx=6)
     ttk.Button(btns, text='Remove Selected', command=remove_selected_emulator).pack(side='left', padx=6)
-
     # populate the list initially
     refresh_installed_list()
     
@@ -1115,9 +1155,14 @@ else:
     root = tk.Tk()
 root.title("Xenia Manager")
 
-plus_icon = PhotoImage(file="./assets/icons/plus.png")
-minus_icon = PhotoImage(file="./assets/icons/minus.png")
-open_folder_icon = PhotoImage(file="./assets/icons/open-folder.png")
+plus_icon_path = get_asset_path("plus.png")
+minus_icon_path = get_asset_path("minus.png")
+open_folder_icon_path = get_asset_path("open-folder.png")
+
+
+plus_icon = PhotoImage(file=plus_icon_path)
+minus_icon = PhotoImage(file=minus_icon_path)
+open_folder_icon = PhotoImage(file=open_folder_icon_path)
 
 def load_state():
     path = get_labels_path()
@@ -1141,10 +1186,11 @@ def save_state(state):
     except Exception as e:
         messagebox.showerror('Save Error', f'Failed to save config: {e}')
 
-
 state = load_state()
-labels = state.get("labels", {})  # mapping: folder_name -> label string
-emulators = state.get("emulators", {})  # mapping: emulator_path -> display name
+state = state if state is not None else {} # If state is None, assign {} to state.
+
+labels = state.get("labels", {})
+emulators = state.get("emulators", {})
 
 # Detect local Xenia Canary executables next to this script and add to emulators if found
 script_dir = os.path.abspath(os.path.dirname(__file__))
@@ -1160,6 +1206,168 @@ for candidate in ("xenia_canary.exe", "xenia_canary_netplay.exe"):
 
 # Track installed emulator versions (path -> version string)
 installed_emulators = state.setdefault('installed_emulators', {})
+
+def dashboard_installer():
+    """Open a dashboard installer window to select and download dashboards from a predefined list."""
+    
+    # --- 1. GUI Setup (Main Selection Window) ---
+    top = tk.Toplevel()
+    top.title("Dashboard Installer")
+    top.geometry("600x400")
+    
+    label = ttk.Label(top, text="Dashboard Installer - Select a dashboard to install:")
+    label.pack(padx=10, pady=10)
+    
+    dashboard_listbox = tk.Listbox(top, selectmode=tk.MULTIPLE)
+    
+    # --- 2. Fetch Dashboard List ---
+    dashboards = {}
+    url = "https://api.github.com/repos/misterwaztaken/xbox360-dashboard-collection/releases"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            releases = response.json()
+            for release in releases:
+                release_tag = release.get("tag_name", "unknown")
+                assets = release.get("assets", [])
+
+                for asset in assets:
+                    asset_name = asset["name"]
+                    if asset_name.endswith(".zip"):
+                        unique_id = f"[{release_tag}] {asset_name}" 
+                        dashboards[unique_id] = {
+                            "name": asset_name,
+                            "url": asset["browser_download_url"],
+                            "tag_name": release_tag
+                        }
+        else:
+            messagebox.showerror("Error", f"Failed to fetch dashboard list: HTTP {response.status_code}")
+            top.destroy()
+            return
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to fetch dashboard list: {e}")
+        top.destroy()
+        return
+
+    # --- 3. Populate Listbox ---
+    for unique_id in dashboards.keys():
+        # 🌟 CRITICAL FIX: The listbox entry MUST be the dictionary key (unique_id)
+        # to ensure the lookup works in the download function.
+        dashboard_listbox.insert(tk.END, unique_id) 
+        
+    dashboard_listbox.pack(fill='both', expand=True, padx=10, pady=10)
+
+    # --- 4. Threaded Download Logic ---
+
+    def start_download_thread():
+        """Starts the download process in a new thread."""
+        selected_indices = dashboard_listbox.curselection()
+        if not selected_indices:
+            messagebox.showinfo("No Selection", "No dashboards selected for download.")
+            return
+
+        # Disable the buttons while downloading
+        download_button.config(state=tk.DISABLED)
+        cancel_button.config(state=tk.DISABLED)
+        
+        # Get the unique_ids for the selected items
+        selected_dashboards_keys = [dashboard_listbox.get(i) for i in selected_indices]
+        
+        # Start the heavy lifting in a new thread
+        download_thread = threading.Thread(
+            target=threaded_download_worker,
+            args=(selected_dashboards_keys, top, download_button, cancel_button)
+        )
+        download_thread.start()
+
+
+    def threaded_download_worker(selected_keys, parent_window, download_btn, cancel_btn):
+        """Worker function executed in the separate thread."""
+        
+        # Create a non-blocking progress window
+        progress_top = tk.Toplevel(parent_window)
+        progress_top.title("Downloading...")
+        progress_top.geometry("300x150")
+        
+        progress_label = ttk.Label(progress_top, text="Starting downloads...")
+        progress_label.pack(pady=10, padx=10)
+        
+        # A main progress bar for all packages
+        total_progress = ttk.Progressbar(progress_top, orient='horizontal', length=280, mode='determinate')
+        total_progress.pack(pady=5, padx=10)
+        total_progress['maximum'] = len(selected_keys)
+        
+        # A sub-progress bar for the current file (will use 'indeterminate' as chunking is complex)
+        file_progress = ttk.Progressbar(progress_top, orient='horizontal', length=280, mode='indeterminate')
+        file_progress.pack(pady=5, padx=10)
+
+        # Start the file progress bar spinning
+        file_progress.start(10) # 10ms update interval
+        
+        successful_downloads = 0
+        
+        for i, unique_id in enumerate(selected_keys):
+            dash_info = dashboards.get(unique_id)
+            if not dash_info:
+                continue
+
+            download_url = dash_info["url"]
+            dash_name = dash_info["name"]
+            release_tag = dash_info["tag_name"]
+            
+            # Update the status label (must be done safely in the main thread)
+            progress_top.after(0, lambda name=dash_name: progress_label.config(text=f"Downloading: {name}"))
+            
+            try:
+                # Use stream=True to potentially handle large files, though we won't use chunking for this example
+                response = requests.get(download_url, stream=True)
+                if response.status_code == 200:
+                    zip_data = response.content
+                    with zipfile.ZipFile(io.BytesIO(zip_data)) as zip_ref:
+                        extract_path = os.path.join("dashboard", release_tag) 
+                        # Use parent_window.after(0, ...) to call a helper function 
+                        # to ensure ensure_dir is defined and safe, or trust your setup.
+                        
+                        # Assuming ensure_dir is safe/defined globally:
+                        ensure_dir(extract_path)
+                        zip_ref.extractall(extract_path)
+                        
+                        print(f"Successfully installed dashboard: {dash_name}")
+                        successful_downloads += 1
+                        
+                        # Update the total progress bar
+                        progress_top.after(0, lambda count=i+1: total_progress.config(value=count))
+                else:
+                    print(f"Failed to download dashboard {dash_name}: HTTP {response.status_code}")
+            except Exception as e:
+                print(f"Error downloading dashboard {dash_name}: {e}")
+                
+        # --- Download Complete Cleanup (run in main thread) ---
+        
+        # Stop file progress bar
+        file_progress.stop()
+
+        # Update final message and close the progress window
+        progress_top.after(0, progress_top.destroy) 
+        
+        # Show final message and destroy the original window (in main thread)
+        parent_window.after(0, lambda: messagebox.showinfo("Download Complete", f"Successfully installed {successful_downloads} dashboard(s)."))
+        parent_window.after(0, parent_window.destroy) 
+        
+        # Assume refresh_trees is defined globally and safe to call in the main thread
+        parent_window.after(0, refresh_trees)
+
+
+    # --- 5. Button Setup (Main Selection Window) ---
+    btn_frame = ttk.Frame(top)
+    btn_frame.pack(fill='x', padx=10, pady=10)
+    
+    # 🌟 CRITICAL CHANGE: Hook button to the new threading function
+    download_button = ttk.Button(btn_frame, text="Download Selected", command=start_download_thread)
+    download_button.pack(side='left', padx=5)
+    
+    cancel_button = ttk.Button(btn_frame, text="Cancel", command=top.destroy)
+    cancel_button.pack(side='right', padx=5)
 
 def detect_installed_emulators(scan_dirs=None):
     """Scan for installed emulator executables and populate state['installed_emulators'].

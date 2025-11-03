@@ -1,43 +1,21 @@
 {
-  "labels": {
-    "2012.08.30": "Does Not Work",
-    "2011.11.20": "Partially Working",
-    "2009.06": "Works",
-    "2008 - Blades (2.0.6770.0)(latest)": "Works",
-    "2005.11.22 - Blades (2.0.1888.0)(original shipped version)": "Works",
-    "2006.11.30 - Blades (2.0.4548.0)": "Works",
-    "2014.04.05 - Metro (2.0.16747.0)": "Does Not Work",
-    "2013.07.11 - Metro (2.0.16525)": "Does Not Work",
-    "2012.12.07 - Metro (2.0.14699.0)": "Partially Working",
-    "2012.08.30 - Metro (2.0.16154)": "Partially Working",
-    "2011.11.20 - Metro (2.0.14696)": "Partially Working",
-    "2011.10.11 - Kinect (2.0.13604.0)(latest)": "Partially Working",
-    "2010.11.01 - Kinect (2.0.12611.0)(first)": "Partially Working",
-    "2009.10.28 - NXE (2.0.8955.0)": "Partially Working",
-    "2009.06 - NXE (2.0.7371.32)": "Works",
-    "2007.12.04 - Blades (2.0.6683.0)": "Works"
-  },
-  "emulators": {
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "Xenia Canary",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "Xenia Canary",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\stable\\v1.0.2825-master\\xenia.exe": "Xenia",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Xenia Canary"
-  },
-  "games": [],
-  "settings": {
-    "dashboard_folders": [],
-    "suppress_does_not_work_warning": true
-  },
-  "emulator": {
-    "fullscreen": true
-  },
   "installed_emulators": {
     "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "9132035",
     "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "2.3.0",
     "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\stable\\v1.0.2825-master\\xenia.exe": "v1.0.2825-master",
     "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia-canary-dbexperiment_2.3.0.exe": "Legacy Install",
     "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia.exe": "Legacy Install",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Legacy Install"
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Legacy Install",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\8197881\\xenia_canary.exe": "8197881"
   },
-  "versions": {}
+  "emulator": {
+    "fullscreen": false
+  },
+  "emulators": {
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "Xenia Canary 9132035",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "Xenia Canary (db-experiment) 2.3.0",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\stable\\v1.0.2825-master\\xenia.exe": "Xenia v1.0.2825-master",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Xenia Canary",
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\8197881\\xenia_canary.exe": "Xenia Canary 8197881"
+  }
 }
