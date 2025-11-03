@@ -70,6 +70,24 @@ def import_dashboard():
     messagebox.showinfo("Imported", f"Imported {len(paths)} file(s) into '{name}'")
     refresh_trees()
 
+def get_version_dir(emulator_type, version=None):
+    """Get the directory path for a specific version"""
+    base = os.path.join(os.path.dirname(__file__), 'versions')
+    if emulator_type == "xenia-canary":
+        base = os.path.join(base, 'canary')
+    elif emulator_type == "xenia-stable":
+        base = os.path.join(base, 'stable')
+    elif emulator_type == "xenia-oldercanary":
+        base = os.path.join(base, 'canary') # it's still normal canary, just different release repo
+    elif emulator_type == "xenia-canary-dbexperiment":
+        base = os.path.join(base, 'canary-dbexperiment') # now this is a little different, still important though
+    else:
+        raise ValueError(f"Invalid emulator type: {emulator_type}")
+    
+    if version:
+        return os.path.join(base, version)
+    return base
+
 def update_xenia(emulator, version=None):
     """
     Update Xenia to a specific version or the latest version
@@ -87,8 +105,19 @@ def update_xenia(emulator, version=None):
     elif emulator == "xenia-oldercanary":
         OWNER = "xenia-canary"
         REPO = "xenia-canary" # older releases were kept at the xenia-canary repo
+    elif emulator == "xenia-canary-dbexperiment":
+        OWNER = "seven7000real"
+        REPO = "xenia-canary" # experimental dashboard changes
     else:
         messagebox.showerror("Error", "Invalid emulator type specified: " + emulator)
+        return
+        
+    # Create version directory
+    try:
+        version_dir = get_version_dir(emulator)
+        os.makedirs(version_dir, exist_ok=True)
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to create version directory: {e}")
         return
         
     # Create progress popup
@@ -221,16 +250,20 @@ def update_xenia(emulator, version=None):
         assets = release_info.get("assets", [])
         download_url = None
         for asset in assets:
-            if REPO == "xenia-canary-releases": # canary releases
+            if REPO == "xenia-canary-releases" and OWNER == "xenia-canary": # canary releases
                 if asset["name"].endswith(".zip") and asset["name"].startswith("xenia_canary_windows"):
                     download_url = asset["browser_download_url"]
                     break
-            elif REPO == "release-builds-windows": # stable releases (nice naming convention LOL)
+            elif REPO == "release-builds-windows" and OWNER == "xenia-project": # stable releases (nice naming convention LOL)
                 if asset["name"].endswith(".zip") and "xenia_master" in asset["name"].lower():
                     download_url = asset["browser_download_url"]
                     break
-            elif REPO == "xenia-canary": # older canary releases
+            elif REPO == "xenia-canary" and OWNER == "xenia-canary": # older canary releases
                 if asset["name"].endswith(".zip") and "xenia_canary" in asset["name"].lower():
+                    download_url = asset["browser_download_url"]
+                    break
+            elif REPO == "xenia-canary" and OWNER == "seven7000real": # older canary releases
+                if asset["name"].endswith(".exe") and "xenia_canary" in asset["name"].lower():
                     download_url = asset["browser_download_url"]
                     break
                 
@@ -240,8 +273,10 @@ def update_xenia(emulator, version=None):
         # Create temp directory
         update_status("Downloading update...")
         os.makedirs("temp", exist_ok=True)
-        zip_path = os.path.join("temp", f"{emulator}_{version or 'latest'}.zip")
-        
+        if not REPO == "xenia-canary" and not OWNER == "seven7000real": # exe releases are not zips     
+            zip_path = os.path.join("temp", f"{emulator}_{version or 'latest'}.zip")
+        else:
+            zip_path = os.path.join("temp", f"{emulator}_{version or 'latest'}.exe")
         # Download with progress tracking
         download_with_progress(download_url, zip_path)
         
@@ -251,25 +286,77 @@ def update_xenia(emulator, version=None):
         # Extract and install
         update_status("Installing update...")
         update_progress(0, "Extracting files...")
+
+        is_exe_download = (REPO == "xenia-canary" and OWNER == "seven7000real")
         
-        # Extract the zip
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall("temp/xenia_update")
+        # Determine the source directory for installation files
+        if is_exe_download:
+            # If it's an EXE, the source is the temp directory itself, 
+            # and the file is the EXE itself.
+            src_dir = os.path.dirname(zip_path) # "temp"
+            exe_filename = os.path.basename(zip_path) # xenia_canary-dbexperiment_*.exe
+        else:
+            # Extract the zip for all other cases
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall("temp/xenia_update")
+            src_dir = os.path.join("temp", "xenia_update")
             
-        # Copy files to main directory
+        # Copy files to version-specific directory
         update_progress(50, "Copying files...")
-        dest_dir = os.path.abspath(os.path.dirname(__file__))
+        version_tag = version or release_info.get('tag_name', 'latest')
+        dest_dir = get_version_dir(emulator, version_tag)
+        os.makedirs(dest_dir, exist_ok=True)
+        
         src_dir = os.path.join("temp", "xenia_update")
         
-        for root, dirs, files in os.walk(src_dir):
-            if cancel_state["cancelled"]:
-                raise Exception("Update cancelled by user")
-            for file in files:
-                src_path = os.path.join(root, file)
-                rel_path = os.path.relpath(src_path, src_dir)
-                dest_path = os.path.join(dest_dir, rel_path)
-                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                shutil.copy2(src_path, dest_path)
+        # Clean existing version directory
+        for item in os.listdir(dest_dir):
+            item_path = os.path.join(dest_dir, item)
+            try:
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                else:
+                    shutil.rmtree(item_path)
+            except Exception as e:
+                print(f"Warning: Failed to clean {item_path}: {e}")
+        
+        # Copy new files
+        if is_exe_download:
+            # For the EXE download, move the EXE file directly
+            src_path = zip_path # The full path to the downloaded EXE
+            dest_path = os.path.join(dest_dir, exe_filename)
+            shutil.copy2(src_path, dest_path)
+        else:
+            # Copy all files from the extracted zip folder
+            for root, dirs, files in os.walk(src_dir):
+                if cancel_state["cancelled"]:
+                    raise Exception("Update cancelled by user")
+                for file in files:
+                    src_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(src_path, src_dir)
+                    dest_path = os.path.join(dest_dir, rel_path)
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    shutil.copy2(src_path, dest_path)
+                
+        # Create symlinks in root for convenience
+        main_dir = os.path.abspath(os.path.dirname(__file__))
+        for file in os.listdir(dest_dir):
+            if file.endswith('.exe'):
+                src = os.path.join(dest_dir, file)
+                dst = os.path.join(main_dir, file)
+                # Remove existing symlink/file
+                try:
+                    if os.path.exists(dst):
+                        if os.path.islink(dst):
+                            os.remove(dst)
+                        else:
+                            # Backup real file if it exists
+                            backup = dst + '.backup'
+                            shutil.move(dst, backup)
+                    # Create symlink
+                    os.symlink(src, dst)
+                except Exception as e:
+                    print(f"Warning: Failed to create symlink {dst}: {e}")
         
         # Record installed executable version(s)
         try:
@@ -294,7 +381,10 @@ def update_xenia(emulator, version=None):
         # Clean up
         update_status("Cleaning up...")
         update_progress(90, "Removing temporary files...")
-        shutil.rmtree("temp/xenia_update", ignore_errors=True)
+        
+        if not is_exe_download:
+            shutil.rmtree("temp/xenia_update", ignore_errors=True)
+            
         try:
             if os.path.exists(zip_path):
                 os.remove(zip_path)
@@ -318,9 +408,10 @@ def update_xenia(emulator, version=None):
     finally:
         # Clean up temp files if they exist
         try:
-            shutil.rmtree("temp/xenia_update", ignore_errors=True)
-            if 'zip_path' in locals():
-                os.remove(zip_path)
+            if not is_exe_download:
+                shutil.rmtree("temp/xenia_update", ignore_errors=True)
+            if 'zip_path' in locals() and os.path.exists(zip_path):
+                 os.remove(zip_path)
         except Exception:
             pass
         
@@ -750,6 +841,9 @@ def open_manager_config():
         elif product == 'oldercanary':
             owner = 'xenia-canary'
             repo = 'xenia-canary' # older releases were kept at the xenia-canary repo
+        elif product == 'canary-dbexperiment':
+            owner = 'seven7000real'
+            repo = 'xenia-canary' # experimental dashboard changes
         else:
             print("Unknown product for fetching versions! Falling back to stable.")
             print(product)
@@ -777,15 +871,6 @@ def open_manager_config():
             node_id = f"canary_{version}"
             versions_tree.insert(canary_node, 'end', node_id, text=f"{version} ({date})")
             
-        # Add Xenia Stable node
-        stable_node = versions_tree.insert('', 'end', text='Xenia Stable', open=True)
-        stable_versions = fetch_xenia_versions('stable')
-        for release in stable_versions:
-            version = release.get('tag_name', '')
-            date = release.get('published_at', '').split('T')[0]
-            node_id = f"stable_{version}"
-            versions_tree.insert(stable_node, 'end', node_id, text=f"{version} ({date})")
-            
         # Add older Xenia Canary node
         old_canary_node = versions_tree.insert('', 'end', text='Xenia Canary (older)', open=True)
         old_canary_versions = fetch_xenia_versions('oldercanary')
@@ -794,7 +879,25 @@ def open_manager_config():
             date = release.get('published_at', '').split('T')[0]
             node_id = f"oldercanary_{version}"
             versions_tree.insert(old_canary_node, 'end', node_id, text=f"{version} ({date})")
+            
+        # Add experimental Xenia Canary (dashboard experiment) node
+        exp_node = versions_tree.insert('', 'end', text='Xenia Canary (dbexperiment) (seven7000real)', open=True)
+        exp_versions = fetch_xenia_versions('canary-dbexperiment')
+        for release in exp_versions:
+            version = release.get('tag_name', '')
+            date = release.get('published_at', '').split('T')[0]
+            node_id = f"canary-dbexperiment_{version}"
+            versions_tree.insert(exp_node, 'end', node_id, text=f"{version} ({date})")
 
+        # Add Xenia Stable node
+        stable_node = versions_tree.insert('', 'end', text='Xenia Stable', open=True)
+        stable_versions = fetch_xenia_versions('stable')
+        for release in stable_versions:
+            version = release.get('tag_name', '')
+            date = release.get('published_at', '').split('T')[0]
+            node_id = f"stable_{version}"
+            versions_tree.insert(stable_node, 'end', node_id, text=f"{version} ({date})")
+        
     def show_version_info(event):
         item_id = versions_tree.selection()[0]
         if not versions_tree.parent(item_id):  # Skip root nodes
@@ -839,10 +942,24 @@ def open_manager_config():
         menu = tk.Menu(root, tearoff=0)
         
         product, version = item_id.split('_', 1)
-        menu.add_command(label=f"Switch to Version {version}", 
-                        command=lambda: update_xenia(f'xenia-{product}', version))
+        
+        # Check if this version is already installed
+        version_dir = get_version_dir(f'xenia-{product}', version)
+        is_installed = os.path.exists(version_dir) and any(f.endswith('.exe') for f in os.listdir(version_dir))
+        
+        if is_installed:
+            menu.add_command(label=f"Version {version} (Installed)", state='disabled')
+            menu.add_separator()
+        else:
+            menu.add_command(label=f"Install Version {version}", 
+                           command=lambda: update_xenia(f'xenia-{product}', version))
+                           
         menu.add_command(label="View Changelog", 
                         command=lambda: show_version_info(None))
+        
+        if is_installed:
+            menu.add_command(label="Open Version Directory",
+                           command=lambda: os.startfile(version_dir))
         
         menu.tk_popup(event.x_root, event.y_root)
 
@@ -890,14 +1007,37 @@ def open_manager_config():
 
     def refresh_installed_list():
         installed_list.delete(0, tk.END)
-        inst = state.get('installed_emulators', {})
-        if not inst:
+        installed = detect_installed_emulators()
+        
+        if not installed:
             installed_list.insert(tk.END, '(No installed emulators detected)')
             return
-        for path, ver in sorted(inst.items()):
-            name = os.path.basename(path)
-            display = f"{name} — {ver} — {path}"
-            installed_list.insert(tk.END, display)
+        
+        # Group by version directories
+        by_version = {}
+        for path, version in installed.items():
+            if os.path.islink(path):
+                continue  # Skip symlinks since we'll show their targets
+            
+            is_versioned = '/versions/' in path.replace('\\', '/')
+            if is_versioned:
+                variant = 'Canary' if 'canary' in path.lower() else 'Stable'
+                version_key = f"{variant} {version}"
+            else:
+                version_key = 'Legacy Installations'
+            
+            if version_key not in by_version:
+                by_version[version_key] = []
+            by_version[version_key].append(path)
+        
+        # Display grouped by version
+        for version_key in sorted(by_version.keys()):
+            installed_list.insert(tk.END, f"=== {version_key} ===")
+            for path in sorted(by_version[version_key]):
+                name = os.path.basename(path)
+                installed_list.insert(tk.END, f"  {name}")
+                installed_list.insert(tk.END, f"  {path}")
+            installed_list.insert(tk.END, '')
 
     def detect_and_refresh():
         detect_installed_emulators()
@@ -917,18 +1057,39 @@ def open_manager_config():
         sel = installed_list.curselection()
         if not sel:
             return
+        
+        # Get selected line and check if it's a path line (indented with spaces)
         line = installed_list.get(sel[0])
-        path = line.split(' — ')[-1]
-        # remove from state['installed_emulators'] and from state['emulators'] if present
-        inst = state.get('installed_emulators', {})
-        if path in inst:
-            inst.pop(path, None)
-        ems = state.get('emulators', {})
-        if path in ems:
-            ems.pop(path, None)
-        state['installed_emulators'] = inst
-        state['emulators'] = ems
-        save_state(state)
+        if not line.startswith('  '):  # Not a path line
+            return
+            
+        # Extract path from the indented line
+        path = line.strip()
+        if os.path.exists(path):
+            # If it's in a version directory, remove the whole directory
+            if '/versions/' in path.replace('\\', '/'):
+                version_dir = os.path.dirname(path)
+                try:
+                    # Remove symlinks first
+                    exe_name = os.path.basename(path)
+                    symlink = os.path.join(script_dir, exe_name)
+                    if os.path.islink(symlink) and os.path.realpath(symlink) == path:
+                        os.remove(symlink)
+                    # Remove version directory
+                    shutil.rmtree(version_dir)
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to remove version: {e}")
+            
+            # Remove from state tracking
+            inst = state.get('installed_emulators', {})
+            if path in inst:
+                inst.pop(path, None)
+            ems = state.get('emulators', {})
+            if path in ems:
+                ems.pop(path, None)
+            state['installed_emulators'] = inst
+            state['emulators'] = ems
+            save_state(state)
         refresh_installed_list()
 
     btns = ttk.Frame(emu_frame)
@@ -996,25 +1157,49 @@ installed_emulators = state.setdefault('installed_emulators', {})
 
 def detect_installed_emulators(scan_dirs=None):
     """Scan for installed emulator executables and populate state['installed_emulators'].
-    If installed via this manager we attempt to record the version (from state['versions']),
-    otherwise store 'Unknown'."""
-    scan_dirs = scan_dirs or [script_dir]
+    Detects both versioned installations and legacy installations."""
     found = {}
+    
+    # First check versioned installations
+    versions_dir = os.path.join(script_dir, 'versions')
+    if os.path.exists(versions_dir):
+        for variant in ['canary', 'stable']:
+            variant_dir = os.path.join(versions_dir, variant)
+            if os.path.exists(variant_dir):
+                for version_dir in os.listdir(variant_dir):
+                    version_path = os.path.join(variant_dir, version_dir)
+                    if os.path.isdir(version_path):
+                        for fn in os.listdir(version_path):
+                            if fn.lower().endswith('.exe') and 'xenia' in fn.lower():
+                                exe_path = os.path.abspath(os.path.join(version_path, fn))
+                                found[exe_path] = version_dir  # Use directory name as version
+    
+    # Then scan provided directories (or script_dir) for legacy installations
+    scan_dirs = scan_dirs or [script_dir]
     for d in scan_dirs:
         try:
             for fn in os.listdir(d):
                 if fn.lower().endswith('.exe') and 'xenia' in fn.lower():
                     path = os.path.abspath(os.path.join(d, fn))
-                    # If we already know a version for this exact path, keep it
-                    version = state.get('installed_emulators', {}).get(path)
-                    if not version:
-                        # try infer from known versions stored under keys like 'xenia-canary'
-                        if 'canary' in fn.lower():
-                            version = state.get('versions', {}).get('xenia-canary', 'Unknown')
-                        else:
-                            version = state.get('versions', {}).get('xenia-stable', 'Unknown')
-                    found[path] = version
-        except Exception:
+                    if path not in found:  # Don't override versioned installations
+                        # Legacy paths - check if they're symlinks first
+                        if os.path.islink(path):
+                            real_path = os.path.realpath(path)
+                            if real_path in found:
+                                # This is a symlink to a versioned installation
+                                found[path] = found[real_path]
+                                continue
+                        
+                        # Otherwise use state version or mark as legacy
+                        version = state.get('installed_emulators', {}).get(path)
+                        if not version:
+                            if 'canary' in fn.lower():
+                                version = state.get('versions', {}).get('xenia-canary', 'Legacy Install')
+                            else:
+                                version = state.get('versions', {}).get('xenia-stable', 'Legacy Install')
+                        found[path] = version
+        except Exception as e:
+            print(f"Warning: Failed to scan {d}: {e}")
             continue
     # Also include any emulators explicitly configured by user
     for path in list(state.get('emulators', {}).keys()):
@@ -1291,7 +1476,7 @@ def populate_dashboards_tree():
             if os.path.isdir(sub):
                 add_folder_to_tree(sub, folder_id)
 
-    default_path = 'Xbox 360 Dashboards'
+    default_path = 'dashboard'
     if os.path.exists(default_path):
         add_folder_to_tree(default_path)
 

@@ -1,0 +1,133 @@
+i> 000025F4 Build: detached / b2120a182fcb5c8d1d41e796bebf2a41c4c25f14 on Jan 10 2020
+i> 000025F4 Content root: F:\Xenia Dash\content
+i> 000025F4 Loaded config: F:\Xenia Dash\xenia-canary-config.toml
+i> 000025F4 Loading Account file from path F:\Xenia Dash\content\FFFE07D1\00010000\E0000000BEEFCAFE.dir\Account
+i> 000025F4 Loaded Account 'XeniaUser0' successfully!
+i> 000025F4 Loaded 0 profile GPDs
+i> 000025F4 Loading Account file from path F:\Xenia Dash\content\FFFE07D1\00010000\E0000000BEEFCAFE.dir\Account
+i> 000025F4 Loaded Account 'XeniaUser0' successfully!
+i> 000025F4 Loaded 0 profile GPDs
+i> 000025F4 DXGI adapter: AMD Radeon(TM) Vega 8 Graphics (vendor 1002, device 15D8)
+i> 000025F4 Direct3D 12 device features:
+i> 000025F4 * Max GPU virtual address bits per resource: 44
+i> 000025F4 * Programmable sample positions: tier 2
+i> 000025F4 * Rasterizer-ordered views: yes
+i> 000025F4 * Tiled resources: tier 3
+i> 000025F4 Added handle:00000004 for class xe::kernel::XObject
+i> 000025F4 XThread00000004 (1) Stack: 40010000-40030000 FakeHWThread: (0)
+i> 000025F4 Added handle:00000008 for class xe::kernel::XObject
+K> 00000004 XThread::Execute thid 1 (handle=00000004, 'GraphicsSystem Command Processor (00000004)', native=00000458, <host>)
+i> 000025F4 XThread00000008 (2) Stack: 40050000-40070000 FakeHWThread: (2)
+K> 00000008 XThread::Execute thid 2 (handle=00000008, 'GraphicsSystem Vsync (00000008)', native=00002690, <host>)
+i> 000025F4 Added handle:0000000C for class xe::kernel::XObject
+i> 000025F4 XThread0000000C (3) Stack: 40090000-400B0000 FakeHWThread: (4)
+i> 000025F4 Added handle:00000010 for class xe::kernel::XObject
+i> 000025F4 XThread00000010 (4) Stack: 400D0000-400F0000 FakeHWThread: (1)
+K> 0000000C XThread::Execute thid 3 (handle=0000000C, 'XMA Decoder Worker (0000000C)', native=00004314, <host>)
+i> 000025F4 Added handle:00000014 for class xe::kernel::XObject
+K> 00000010 XThread::Execute thid 4 (handle=00000010, 'Audio Worker (00000010)', native=00001F04, <host>)
+i> 000025F4 Added handle:00000018 for class xe::kernel::XObject
+i> 000025F4 Added handle:0000001C for class xe::kernel::XObject
+i> 000025F4 Launching module game:\$flash_ximecore.xex
+i> 000025F4 Added handle:00000020 for class xe::kernel::XObject
+F> 000025F4 HostPathDevice::ResolvePath(\$flash_ximecore.xex)
+F> 000025F4 HostPathDevice::ResolvePath(\$flash_ximecore.xexp)
+!> 000025F4 ResolvePath(update:\$flash_ximecore.xexp) failed - device not found
+F> 000025F4 HostPathDevice::ResolvePath(\$flash_ximecore.xexp)
+i> 000025F4 Module \Device\Harddisk0\Partition0\$flash_ximecore.xex:
+    Module Flags: 00000008
+Security Header:
+     Image Flags: 30000000
+    Load Address: 91680000
+      Image Size: 00021000
+    Export Table: 00000000
+Optional Header Count: 10
+  XEX_HEADER_FILE_FORMAT_INFO (TODO):
+  XEX_HEADER_BOUNDING_PATH: \Device\Flash\XIMECORE.xex
+  XEX_HEADER_ORIGINAL_BASE_ADDRESS: 10000000
+  XEX_HEADER_ENTRY_POINT: 91687CA8
+  XEX_HEADER_IMAGE_BASE_ADDRESS: 91680000
+  XEX_HEADER_IMPORT_LIBRARIES:
+    xam.xex - 68 imports
+      Version: 0.0.7371.32
+      Min Version: 0.0.7371.32
+    xboxkrnl.exe - 18 imports
+      Version: 0.0.7371.32
+      Min Version: 0.0.7371.32
+  XEX_HEADER_CHECKSUM_TIMESTAMP (TODO):
+  XEX_HEADER_ORIGINAL_PE_NAME: XIMECORE.dll
+  XEX_HEADER_STATIC_LIBRARIES:
+    LIBCX    : 2.0.7371.0
+    XBOXKRNL : 2.0.7371.0
+  XEX_HEADER_EXECUTION_INFO:
+       Media ID: 00000000
+       Title ID: 00000000
+    Savegame ID: 00000000
+    Disc Number / Total: 0 / 0
+Sections:
+    0 RODATA    7 pages    91680000 - 91687000 (28672 bytes)
+    7 CODE      9 pages    91687000 - 91690000 (36864 bytes)
+   16 CODE     16 pages    91690000 - 916A0000 (65536 bytes)
+   32 RWDATA    1 pages    916A0000 - 916A1000 (4096 bytes)
+Imports:
+ xam - 34 imports
+   Version: 0.0.7371.32
+   Min Version: 0.0.7371.32
+
+         Total:   34
+         Known:  100% (34 known, 0 unknown)
+   Implemented:   20% (7 implemented, 27 unimplemented)
+
+   F 91680400 9169F9EC 24C ( 588) !! XamUnregisterSysApp
+   F 91680404 9169F9FC 24B ( 587) !! XamRegisterSysApp
+   F 91680408 9169FA0C 1F5 ( 501) !! XMsgCompleteIORequest
+   F 9168040C 9169FA1C 269 ( 617)    XamContentOpenFile
+   F 91680410 9169FA2C 640 (1600) !! XamPackageManagerFindPackageContainingIndexedXEX
+   F 91680414 9169FA3C 25A ( 602)    XamContentClose
+   F 91680418 9169FA4C 1EA ( 490)    XamAlloc
+   F 9168041C 9169FA5C 1EC ( 492)    XamFree
+   F 91680420 9169FA6C 1ED ( 493) !! XamAllocSize
+   F 91680424 9169FC2C 41E (1054) !! WriteFile
+   F 91680428 9169FC1C 20A ( 522)    XamUserGetXUID
+   F 9168042C 9169FC0C 237 ( 567) !! XamProfileOpen
+   F 91680430 9169FBFC 447 (1095) !! CreateFileA
+   F 91680434 9169FAAC 419 (1049) !! SetLastError
+   F 91680438 9169FABC 3FC (1020) !! RtlAllocateHeap
+   F 9168043C 9169FACC 3FF (1023) !! RtlFreeHeap
+   F 91680440 9169FADC 3FE (1022) !! RtlReAllocateHeap
+   F 91680444 9169FAEC 401 (1025) !! RtlSizeHeap
+   F 91680448 9169FAFC 39F ( 927) !! XuiResourceOpen
+   F 9168044C 9169FB0C 31B ( 795)    XamBuildResourceLocator
+   F 91680450 9169FB1C 282 ( 642)    XamGetSystemVersion
+   F 91680454 9169FB2C 3A1 ( 929) !! XuiResourceClose
+   F 91680458 9169FB3C 3A0 ( 928) !! XuiResourceRead
+   F 9168045C 9169FB4C 3B7 ( 951) !! XuiResourceSeek
+   F 91680460 9169FB5C 416 (1046) !! GetLastError
+   F 91680464 9169FB6C 1AF ( 431) !! XamTaskSchedule
+   F 91680468 9169FB7C 1B1 ( 433) !! XamTaskCloseHandle
+   F 9168046C 9169FB8C 1B4 ( 436) !! XamTaskWaitOnCompletion
+   F 91680470 9169FB9C 1B2 ( 434) !! XamTaskCancel
+   F 91680474 9169FBAC 45E (1118) !! lstrcpyW
+   F 91680478 9169FBBC 464 (1124) !! lstrlenW
+   F 9168047C 9169FBCC 238 ( 568) !! XamProfileClose
+   F 91680480 9169FBDC 414 (1044) !! CloseHandle
+   F 91680484 9169FBEC 41C (1052) !! ReadFile
+
+ xboxkrnl - 9 imports
+   Version: 0.0.7371.32
+   Min Version: 0.0.7371.32
+
+         Total:    9
+         Known:  100% (9 known, 0 unknown)
+   Implemented:  100% (9 implemented, 0 unimplemented)
+
+   F 9168048C 9169FA9C 125 ( 293)    RtlEnterCriticalSection
+   F 91680490 9169FA8C 130 ( 304)    RtlLeaveCriticalSection
+   F 91680494 9169FA7C 12E ( 302)    RtlInitializeCriticalSection
+   F 91680498 9169FC3C 1A1 ( 417)    XexUnloadImage
+   F 9168049C 9169FC4C 199 ( 409)    XexLoadImage
+   F 916804A0 9169FC5C 141 ( 321)    RtlTryEnterCriticalSection
+   F 916804A4 9169FC6C 0CC ( 204)    NtAllocateVirtualMemory
+   F 916804A8 9169FC7C 053 (  83)    KeBugCheckEx
+   F 916804AC 9169FC8C 066 ( 102)    KeGetCurrentProcessType
+
