@@ -1,9 +1,10 @@
-# xenia-manager
+# Xenia Manager
 
 > [!IMPORTANT]
 > This is unfinished! Xenia Manager is a Work-In-Progress.
 
-**What:** Python-based GUI manager for installing different versions of Xenia and managing Xbox 360 games and dashboards
+### What is Xenia Manager?
+Xenia Manager is a Python-based GUI manager for installing different versions of Xenia and managing Xbox 360 games and dashboards
 
 ### Features
 - Install Xenia directly inside the app
