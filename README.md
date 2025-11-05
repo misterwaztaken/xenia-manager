@@ -42,3 +42,6 @@ main dashboard folder called "dashboards" (quite a handful, I know)
 - Add a cover art view for the Games tab
     - Figure out how to wrangle [IGDB](https://www.igdb.com/) and find title (game) names from the file itself to match a cover image to the ISO
 - Enhance repo management (allow for adding of custom Xenia repos, move all repos into a json file)
+
+## Using Xenia Manager
+To use Xenia Manager, download all the files and run main.py. Make sure you have all the packages for it.
