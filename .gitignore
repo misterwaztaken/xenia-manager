@@ -5,6 +5,9 @@ dashboard/
 cache/
 cache0/
 cache1/
+build/
+cache_host/
 temp/
 versions/
-dashboard_labels.json
+main.spec
+xstorage/

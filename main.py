@@ -1,7 +1,13 @@
+# xenia-manager
+# by misterwaztaken
+# version 0.2
+# please give credit if you intend to modify!
+
 import tkinter as tk
 from PIL import Image, ImageTk
 from tkinter import ttk, messagebox, filedialog, simpledialog, PhotoImage
 import os
+import shutil
 import threading
 import json
 import io
@@ -11,6 +17,11 @@ import sys
 import shutil
 import requests
 import pathlib
+import tomllib
+import ssl
+
+print(ssl.get_default_verify_paths())
+print(ssl.OPENSSL_VERSION)
 
 # Optional drag-and-drop support via tkinterdnd2 (recommended on Windows)
 try:
@@ -111,6 +122,8 @@ def get_version_dir(emulator_type, version=None):
         base = os.path.join(base, 'canary') # it's still normal canary, just different release repo
     elif emulator_type == "xenia-canary-dbexperiment":
         base = os.path.join(base, 'canary-dbexperiment') # now this is a little different, still important though
+    elif emulator_type == "xenia-canary-netplay":
+        base = os.path.join(base, 'canary-netplay') # netplay builds
     else:
         raise ValueError(f"Invalid emulator type: {emulator_type}")
     
@@ -138,6 +151,9 @@ def update_xenia(emulator, version=None):
     elif emulator == "xenia-canary-dbexperiment":
         OWNER = "seven7000real"
         REPO = "xenia-canary" # experimental dashboard changes
+    elif emulator == "xenia-canary-netplay":
+        OWNER = "AdrianCassar"
+        REPO = "xenia-canary" # netplay builds
     else:
         messagebox.showerror("Error", "Invalid emulator type specified: " + emulator)
         return
@@ -297,6 +313,10 @@ def update_xenia(emulator, version=None):
                 if asset["name"].endswith(".exe") and "xenia_canary" in asset["name"].lower():
                     download_url = asset["browser_download_url"]
                     break
+            elif REPO == "xenia-canary" and OWNER == "AdrianCassar": # netplay canary releases
+                if asset["name"].endswith(".zip") and "xenia_canary_netplay_windows" in asset["name"].lower():
+                    download_url = asset["browser_download_url"]
+                    break
                 
         if not download_url:
             raise Exception("No Windows release found")
@@ -406,6 +426,8 @@ def update_xenia(emulator, version=None):
                         emulator = fn
                         if 'dbexperiment' in fn.lower() or 'db-experiment' in emulator:
                             ems[ap] = 'Xenia Canary (db-experiment)'
+                        elif 'netplay' in fn.lower() or 'netplay' in emulator:
+                            ems[ap] = 'Xenia Canary (netplay)'
                         else:
                             ems[ap] = 'Xenia Canary' if 'canary' in fn.lower() or 'canary' in emulator else 'Xenia'
                         # also, append version to name if possible
@@ -607,6 +629,160 @@ def update_xenia(emulator, version=None):
             # add ok button to close
             ok_button = tk.Button(error_popup, text="OK", command=error_popup.destroy).pack(pady=10)
 
+def uninstall_xenia(emulator, version=None):
+    """
+    Uninstall a specific version or all installed versions of a Xenia build.
+    :param emulator: Either 'xenia-canary', 'xenia-stable', etc. (matches update_xenia)
+    :param version: Optional specific version to uninstall. If None, uninstalls all of this emulator type.
+    """
+    
+    confirm = messagebox.askyesno(f"Uninstall Xenia '{emulator}' {version}", f"Are you sure you want to uninstall Xenia '{emulator}' (version {version})?\r\rIt will be removed from your installed Xenia emulators, and you will only be able to use it once it is reinstalled.", icon='warning', default='no')
+    
+    if not confirm:
+        print("uninstall cancelled")
+        return
+    # --- 1. Determine directories to clean based on emulator type ---
+    
+    # This logic is copied/adapted from update_xenia to map the emulator string
+    if emulator == "xenia-canary":
+        # We'll target all directories starting with the base name 'xenia-canary' or similar
+        base_name_pattern = "xenia-canary" 
+    elif emulator == "xenia-stable":
+        base_name_pattern = "xenia-stable"
+    elif emulator == "xenia-oldercanary":
+        base_name_pattern = "xenia-oldercanary"
+    elif emulator == "xenia-canary-dbexperiment":
+        base_name_pattern = "xenia-canary-dbexperiment"
+    elif emulator == "xenia-canary-netplay":
+        base_name_pattern = "xenia-canary-netplay"
+    else:
+        messagebox.showerror("Error", f"Invalid emulator type specified for uninstall: {emulator}")
+        return
+
+    # --- 2. Identify directories and state entries to remove ---
+    
+    dirs_to_remove = []
+    keys_to_remove_from_state = []
+    
+    # A. Find version directories (requires access to get_version_dir logic or equivalent)
+    try:
+        # If a specific version is given, we target that one directory
+        if version:
+            version_dir = get_version_dir(emulator, version) # Assuming get_version_dir can handle an explicit version
+            if os.path.exists(version_dir):
+                dirs_to_remove.append(version_dir)
+            
+            # Prepare state key for this specific version
+            # The key in state['installed_emulators'] is the *absolute path* to the EXE
+            # This requires guessing/finding the path, which is complex without seeing get_version_dir.
+            # For simplicity, we target the version map first.
+            keys_to_remove_from_state.append(f"{emulator} {version}") # Dummy key, actual logic needs app path info
+
+        # If no version is given, attempt to clean *all* directories associated with the base name
+        else:
+            # This part is highly dependent on how get_version_dir constructs the path.
+            # We'll need to iterate through a known parent or use the logic from state['emulators']
+            
+            # Safer approach: Iterate through the state information to find paths to delete
+            current_installed = state.get('installed_emulators', {})
+            paths_to_delete = []
+            
+            for exe_path, installed_tag in current_installed.items():
+                # Heuristic: Check if the path belongs to this emulator type based on the name in the tag/path
+                # This logic is very brittle without knowing the exact structure. We rely on 'emulator' in the tag.
+                if base_name_pattern in installed_tag.lower() or base_name_pattern in exe_path.lower():
+                    if version is None or version in installed_tag: # If version is None, remove all matching this base pattern
+                        dirs_to_remove.append(os.path.dirname(exe_path))
+                        keys_to_remove_from_state.append(exe_path)
+                        
+            # Ensure unique directories, as multiple exes might be in one directory
+            dirs_to_remove = list(set(dirs_to_remove))
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not determine installation directories: {e}")
+        return
+
+    # --- 3. Confirmation Popup (Mirroring Update Popup) ---
+    
+    popup = tk.Toplevel()
+    popup.title(f"{emulator} Uninstall")
+    popup.geometry("400x180")
+    
+    status_var = tk.StringVar(value="Preparing for uninstallation...")
+    
+    status_label = ttk.Label(popup, textvariable=status_var)
+    status_label.pack(padx=20, pady=(20, 6))
+
+    # Simple progress bar for visual feedback
+    progress_bar = ttk.Progressbar(popup, mode='determinate', maximum=len(dirs_to_remove) if not version else 100)
+    progress_bar.pack(fill='x', padx=20, pady=6)
+    
+    cancel_state = {"cancelled": False}
+    def cancel_uninstall():
+        cancel_state["cancelled"] = True
+        popup.destroy()
+    
+    ttk.Button(popup, text="Cancel", command=cancel_uninstall).pack(pady=6)
+    popup.update()
+
+    # --- 4. Perform Uninstallation ---
+    
+    try:
+        if not dirs_to_remove and not keys_to_remove_from_state:
+             status_var.set(f"No installed instances of '{emulator}' (version: {version or 'any'}) found.")
+             progress_bar['value'] = 100
+             messagebox.showinfo("Info", status_var.get())
+             popup.destroy()
+             return
+
+        status_var.set(f"Found {len(dirs_to_remove)} directory(ies) to remove...")
+        
+        # Remove Directories
+        for i, dir_path in enumerate(dirs_to_remove):
+            if cancel_state["cancelled"]:
+                raise Exception("Uninstallation cancelled by user")
+            
+            status_var.set(f"Removing directory: {os.path.basename(dir_path)}...")
+            shutil.rmtree(dir_path)
+            
+            progress_bar['value'] = (i + 1) / len(dirs_to_remove) * 50 if dirs_to_remove else 50
+            popup.update()
+            
+        status_var.set("Cleaning up state information...")
+        progress_bar['value'] = 75
+
+        # Remove State Entries (assuming state is managed globally)
+        for key in keys_to_remove_from_state:
+            # Logic to remove from state['installed_emulators'] and state['emulators']
+            # Since we used the EXE path as the key for 'installed_emulators', we use that:
+            if key in state.get('installed_emulators', {}):
+                del state['installed_emulators'][key]
+            # Clean up friendly name in 'emulators' map:
+            for emu_path, emu_name in list(state.get('emulators', {}).items()):
+                 if key == emu_path:
+                     del state['emulators'][emu_path]
+                     break
+            
+        save_state(state)
+        progress_bar['value'] = 90
+
+        status_var.set("Uninstallation complete!")
+        progress_bar['value'] = 100
+        messagebox.showinfo("Success", f"Successfully uninstalled {emulator} (Version: {version or 'All'}).")
+        popup.destroy()
+        
+    except Exception as e:
+        error_msg = str(e)
+        status_var.set(f"Error during uninstallation: {error_msg}")
+        messagebox.showerror("Error", f"Failed to uninstall {emulator}: {error_msg}")
+        
+        # Replace Cancel with Close button on error
+        for widget in popup.winfo_children():
+            if isinstance(widget, ttk.Button) and widget.cget("text") == "Cancel":
+                 widget.destroy()
+        ttk.Button(popup, text="Close", command=popup.destroy).pack(pady=6)
+        popup.update()
+
 def add_game():
     name = simpledialog.askstring("New Game", "Enter folder name for new game:")
     if not name:
@@ -723,6 +899,14 @@ def configure_emulator():
     b = os.path.basename(path).lower()
     if 'canary' in b:
         inferred = versions_map.get('xenia-canary', inferred)
+        if not 'dbexperiment' in b and not 'netplay' in b and not 'older' in b:
+            inferred = versions_map.get('xenia-canary', inferred)
+        elif 'dbexperiment' in b:
+            inferred = versions_map.get('xenia-canary-dbexperiment', inferred)
+        elif 'netplay' in b:
+            inferred = versions_map.get('canary-netplay', inferred)
+        elif 'older' in b:
+            inferred = versions_map.get('xenia-oldercanary', inferred)
     elif 'xenia' in b:
         inferred = versions_map.get('xenia-stable', inferred)
     inst[path] = inferred
@@ -873,7 +1057,7 @@ def open_manager_config():
     versions_tree = ttk.Treeview(update_frame)
     versions_tree.pack(fill='both', expand=True, padx=8, pady=8)
     versions_tree.heading('#0', text='Available Xenia Versions')
-    
+        
     def fetch_xenia_versions(product):
         if product == 'canary':
             owner = 'xenia-canary'
@@ -887,14 +1071,16 @@ def open_manager_config():
         elif product == 'canary-dbexperiment':
             owner = 'seven7000real'
             repo = 'xenia-canary' # experimental dashboard changes
+        elif product == 'canary-netplay':
+            owner = 'AdrianCassar'
+            repo = 'xenia-canary' # older releases were kept at the xenia-canary repo
         else:
             print("Unknown product for fetching versions! Falling back to stable.")
             print(product)
             owner = 'xenia-project'
             repo = 'release-builds-windows' # default to stable
-            
-        url = f'https://api.github.com/repos/{owner}/{repo}/releases'
         try:
+            url = f'https://api.github.com/repos/{owner}/{repo}/releases'
             response = requests.get(url)
             if response.status_code == 200:
                 return response.json()
@@ -931,6 +1117,15 @@ def open_manager_config():
             date = release.get('published_at', '').split('T')[0]
             node_id = f"canary-dbexperiment_{version}"
             versions_tree.insert(exp_node, 'end', node_id, text=f"{version} ({date})")
+            
+        # Add experimental Xenia Canary (netplay) node
+        netplay_node = versions_tree.insert('', 'end', text='Xenia Canary (netplay) (AdrianCassar)', open=True)
+        netplay_versions = fetch_xenia_versions('canary-netplay')
+        for release in netplay_versions:
+            version = release.get('tag_name', '')
+            date = release.get('published_at', '').split('T')[0]
+            node_id = f"canary-netplay_{version}"
+            versions_tree.insert(netplay_node, 'end', node_id, text=f"{version} ({date})")
 
         # Add Xenia Stable node
         stable_node = versions_tree.insert('', 'end', text='Xenia Stable', open=True)
@@ -993,6 +1188,8 @@ def open_manager_config():
         if is_installed:
             menu.add_command(label=f"Version {version} (Installed)", state='disabled')
             menu.add_separator()
+            menu.add_command(label=f"Uninstall Version {version}", 
+                            command=lambda: uninstall_xenia(f'xenia-{product}', version))
         else:
             menu.add_command(label=f"Install Version {version}", 
                            command=lambda: update_xenia(f'xenia-{product}', version))
@@ -1198,6 +1395,9 @@ for candidate in ("xenia_canary.exe", "xenia_canary_netplay.exe"):
     candidate_path = os.path.join(script_dir, candidate)
     if os.path.exists(candidate_path):
         # store absolute path -> display name
+        # netplay is NOT the same as normal canary, so seperate into its own entry
+        display_name = "Xenia Canary (netplay)" if "netplay" in candidate.lower() else "Xenia Canary"
+        emulators[candidate_path] = display_name
         if candidate_path not in emulators:
             emulators[candidate_path] = "Xenia Canary"
             state["emulators"] = emulators
@@ -1453,7 +1653,7 @@ settings_menu.add_command(label="Configure Emulator...", command=configure_emula
 menubar.add_cascade(label="Settings", menu=settings_menu)
 
 help_menu = tk.Menu(menubar, tearoff=0)
-help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Xenia Manager\nVersion 0.1\n\nA simple manager for Xenia Xbox 360 emulator dashboards and games.\n\nDeveloped by kazwaztaken."))
+help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Xenia Manager\nVersion 0.2\n\nA simple manager for Xenia Xbox 360 emulator dashboards and games.\n\nDeveloped by kazwaztaken."))
 menubar.add_cascade(label="Help", menu=help_menu)
 
 root.config(menu=menubar)
