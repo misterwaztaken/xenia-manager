@@ -3,6 +3,12 @@
 # version 0.2
 # please give credit if you intend to modify!
 
+# define proxy ip things (TODO: make this modifiable in settings later)
+PROXY_ADDR = '177.125.208.1'
+PROXY_PORT = '8080'
+AUTH_USER = ""
+AUTH_PASS = ""
+
 import tkinter as tk
 from PIL import Image, ImageTk
 from tkinter import ttk, messagebox, filedialog, simpledialog, PhotoImage
@@ -29,6 +35,21 @@ try:
     HAVE_TKDN = True
 except Exception:
     HAVE_TKDN = False
+
+def get_proxies_dict():
+    """Constructs the dictionary required by the requests library"""
+    if not PROXY_ADDR or not PROXY_PORT:
+        return None
+    
+    if AUTH_USER and AUTH_PASS:
+        auth_string = f"{AUTH_USER}:{AUTH_PASS}@"
+    else:
+        auth_string = ""
+    proxy_url = f"http://{auth_string}{PROXY_ADDR}:{PROXY_PORT}"
+    return {
+        'http': proxy_url,
+        'https': proxy_url,
+    }
 
 # Define the utility function outside of update_xenia()
 def get_app_root_dir(): # this is important for the pyinstaller temp folder handling
@@ -1059,6 +1080,7 @@ def open_manager_config():
     versions_tree.heading('#0', text='Available Xenia Versions')
         
     def fetch_xenia_versions(product):
+        proxies = get_proxies_dict()
         if product == 'canary':
             owner = 'xenia-canary'
             repo = 'xenia-canary-releases'
@@ -1081,9 +1103,14 @@ def open_manager_config():
             repo = 'release-builds-windows' # default to stable
         try:
             url = f'https://api.github.com/repos/{owner}/{repo}/releases'
-            response = requests.get(url)
+            response = requests.get(url, proxies=proxies, timeout=10)
+            response.raise_for_status()
             if response.status_code == 200:
                 return response.json()
+        except requests.exceptions.Timeout:
+            messagebox.showerror('Error', f'Error: Timeout was reached when trying to switch versions')
+        except requests.exceptions.RequestException:
+            messagebox.showerror('Error', f'Connection Error: {e}')
         except Exception as e:
             messagebox.showerror('Error', f'Failed to fetch versions: {e}')
         return []
