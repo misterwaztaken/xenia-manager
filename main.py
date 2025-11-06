@@ -4,10 +4,8 @@
 # please give credit if you intend to modify!
 
 # define proxy ip things (TODO: make this modifiable in settings later)
-PROXY_ADDR = '177.125.208.1'
-PROXY_PORT = '8080'
-AUTH_USER = ""
-AUTH_PASS = ""
+PROXY_ADDR = '24.37.120.42'
+PROXY_PORT = '1080'
 
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -25,6 +23,7 @@ import requests
 import pathlib
 import tomllib
 import ssl
+import socket
 
 print(ssl.get_default_verify_paths())
 print(ssl.OPENSSL_VERSION)
@@ -40,16 +39,14 @@ def get_proxies_dict():
     """Constructs the dictionary required by the requests library"""
     if not PROXY_ADDR or not PROXY_PORT:
         return None
+
+    proxy_url = f"socks5://{PROXY_ADDR}:{PROXY_PORT}"
     
-    if AUTH_USER and AUTH_PASS:
-        auth_string = f"{AUTH_USER}:{AUTH_PASS}@"
-    else:
-        auth_string = ""
-    proxy_url = f"http://{auth_string}{PROXY_ADDR}:{PROXY_PORT}"
     return {
         'http': proxy_url,
         'https': proxy_url,
     }
+    
 
 # Define the utility function outside of update_xenia()
 def get_app_root_dir(): # this is important for the pyinstaller temp folder handling
@@ -1081,6 +1078,25 @@ def open_manager_config():
         
     def fetch_xenia_versions(product):
         proxies = get_proxies_dict()
+        # test
+        try:
+            response = requests.get("http://icanhazip.com", proxies=proxies)
+            print(response.text.strip())
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+        # test 2
+        try:
+            print(f"Attempting connection to {PROXY_ADDR}:{PROXY_PORT}...")
+            s = socket.create_connection((PROXY_ADDR, PROXY_PORT), timeout=5)
+            s.close()
+            print("SUCCESS: Connection to the proxy server established!")
+        except socket.timeout:
+            print("TIMEOUT ERROR: School firewall is likely blocking all traffic to this external proxy.")
+        except ConnectionRefusedError:
+            print("REFUSED ERROR: The external proxy server is up but is refusing the connection.")
+        except OSError as e:
+            print(f"OS ERROR: Could not connect. Is the firewall preventing the connection? ({e})")
+        
         if product == 'canary':
             owner = 'xenia-canary'
             repo = 'xenia-canary-releases'

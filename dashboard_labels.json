@@ -5,7 +5,11 @@
     "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary.exe": "Legacy Install",
     "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\xenia_canary_netplay.exe": "Legacy Install",
     "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "9132035",
-    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "2.3.0"
+    "c:\\Users\\AlexK\\OneDrive\\Documents\\xeniamanager\\xenia-manager\\versions\\canary-dbexperiment\\2.3.0\\xenia-canary-dbexperiment_2.3.0.exe": "2.3.0",
+    "x:\\My Drive\\compsci python projects\\xenia-manager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "9132035",
+    "x:\\My Drive\\compsci python projects\\xenia-manager\\xenia-manager\\xenia.exe": "Legacy Install",
+    "X:\\My Drive\\compsci python projects\\xenia-manager\\xenia-manager\\versions\\canary\\9132035\\xenia_canary.exe": "9132035",
+    "X:\\My Drive\\compsci python projects\\xenia-manager\\xenia-manager\\xenia.exe": "Legacy Install"
   },
   "emulator": {
     "fullscreen": false
