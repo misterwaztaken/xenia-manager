@@ -1,5 +1,5 @@
 games/
-dashboard_labels.json
+config.json
 dist/
 dashboard/
 cache/

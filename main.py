@@ -65,7 +65,7 @@ def get_labels_path():
         parent = os.path.dirname(dash_folder)
     else:
         parent = os.path.abspath(os.path.dirname(__file__))
-    return os.path.join(parent, "dashboard_labels.json")
+    return os.path.join(parent, "config.json")
 
 def refresh_trees():
     populate_dashboards_tree()
@@ -1451,8 +1451,6 @@ def dashboard_installer():
 
     # --- 3. Populate Listbox ---
     for unique_id in dashboards.keys():
-        # 🌟 CRITICAL FIX: The listbox entry MUST be the dictionary key (unique_id)
-        # to ensure the lookup works in the download function.
         dashboard_listbox.insert(tk.END, unique_id) 
         
     dashboard_listbox.pack(fill='both', expand=True, padx=10, pady=10)
@@ -1524,7 +1522,7 @@ def dashboard_installer():
                 if response.status_code == 200:
                     zip_data = response.content
                     with zipfile.ZipFile(io.BytesIO(zip_data)) as zip_ref:
-                        extract_path = os.path.join("dashboard", release_tag) 
+                        extract_path = os.path.join("dashboard") 
                         # Use parent_window.after(0, ...) to call a helper function 
                         # to ensure ensure_dir is defined and safe, or trust your setup.
                         
@@ -1854,7 +1852,10 @@ def update_folder_display(folder):
     if games_tree.exists(game_id):
         games_tree.item(game_id, text=display_text_for(folder))
 
-
+def get_game_metadata(isopath): #TODO: finish & implement (ask user on first start if they want to try and fetch cover art via extract game file)
+    # oh boy here we go -me writing this, 2025
+    game_path = isopath
+    result = subprocess.run(['extract-iso.exe', f'{game_path}', '-d', './temp/game_extract/'])
 
 def populate_dashboards_tree():
     # builds the dashboards tree from the default folder and any configured folders
@@ -1925,7 +1926,7 @@ def populate_games_tree():
     if not os.path.exists(games_path):
         return
     detected_games = []
-    excluded_folders = {'cache', 'cache0', 'cache1'}
+    excluded_folders = {'cache', 'cache0', 'cache1'} # don't include cache folders as they are not games
     for folder in sorted(os.listdir(games_path)):
         if folder in excluded_folders:
             continue
