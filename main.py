@@ -1,11 +1,12 @@
 # xenia-manager
 # by misterwaztaken
-# version 0.2
+# version 0.3-testing
 # please give credit if you intend to modify!
 
 # define proxy ip things (TODO: make this modifiable in settings later)
 PROXY_ADDR = '24.37.120.42'
 PROXY_PORT = '1080'
+TIMEOUT = 5
 
 import tkinter as tk
 from PIL import Image, ImageTk
@@ -24,10 +25,44 @@ import pathlib
 import tomllib
 import ssl
 import socket
+import concurrent.futures
 
 print(ssl.get_default_verify_paths())
 print(ssl.OPENSSL_VERSION)
 
+def github_test(timeout_duration=5):
+    """
+    This function is meant to prevent app hang or crash due to a failure to connect to Github API.
+    This is a semi-permanent fix and I intend to properly integrate a fix for this once I further
+    refine the code (basically shit is everywhere)
+    """
+    try:
+        response = requests.get("https://api.github.com/repos/python/cpython/releases")
+        response.raise_for_status() # raise exception for bad error code
+        releases = response.json()
+        return f"success, fetched {len(releases)} release(s)"
+    except requests.exceptions.Timeout:
+        return "error: The request timed out."
+    except requests.exceptions.RequestException as e:
+        return f"error: An unexpected error occurred: {e}"
+    except Exception as e:
+        # Handle other potential errors within the function
+        return f"an unexpected error occurred: {e}"
+
+
+with concurrent.futures.ProcessPoolExecutor() as executor:
+    future = executor.submit(github_test)
+    try:
+        result = future.result(timeout=TIMEOUT)
+        print(f"test connect to github works")
+        NETWORKING = True # TODO: also make this user-editable manually via settings
+    except concurrent.futures.TimeoutError:
+        print(f"test connect to github FAIL after {TIMEOUT} secs")
+        NETWORKING = False
+    except Exception as e:
+        print(f"an exception occured: {e}")
+        NETWORKING = False
+    
 # Optional drag-and-drop support via tkinterdnd2 (recommended on Windows)
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -952,7 +987,7 @@ def open_manager_config():
     scrollbar.pack(side='right', fill='y', padx=(0,6), pady=6)
     folders_list.config(yscrollcommand=scrollbar.set)
 
-    def refresh_folders():
+    def refresh_folders(): # NOTE: Safe
         folders_list.delete(0, tk.END)
         # Local root dashboard folders
         folders_list.insert(tk.END, '--- Local Dashboard Folders ---')
@@ -976,7 +1011,7 @@ def open_manager_config():
     btn_frame = ttk.Frame(folders_frame)
     btn_frame.pack(fill='x', padx=8, pady=(6,0), before=folders_list)
 
-    def add_folder():
+    def add_folder(): # NOTE: Safe
         folder = filedialog.askdirectory(title='Select dashboard folder to add')
         if not folder:
             return
@@ -994,7 +1029,7 @@ def open_manager_config():
             refresh_trees()
             messagebox.showinfo('Added', 'Dashboard folder added.')
 
-    def remove_folder():
+    def remove_folder(): # NOTE: Safe
         sel = folders_list.curselection()
         if not sel:
             return
@@ -1059,7 +1094,7 @@ def open_manager_config():
     chk = ttk.Checkbutton(gen_frame, text="Suppress 'Does Not Work' launch warning", variable=suppress_var)
     chk.pack(anchor='w', padx=8, pady=8)
     
-    def save_general():
+    def save_general(): # NOTE: Safe
         s = state.setdefault('settings', {})
         s['suppress_does_not_work_warning'] = bool(suppress_var.get())
         state['settings'] = s
@@ -1075,63 +1110,60 @@ def open_manager_config():
     versions_tree = ttk.Treeview(update_frame)
     versions_tree.pack(fill='both', expand=True, padx=8, pady=8)
     versions_tree.heading('#0', text='Available Xenia Versions')
+    
         
-    def fetch_xenia_versions(product):
-        proxies = get_proxies_dict()
-        # test
-        try:
-            response = requests.get("http://icanhazip.com", proxies=proxies)
-            print(response.text.strip())
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred: {e}")
-        # test 2
-        try:
-            print(f"Attempting connection to {PROXY_ADDR}:{PROXY_PORT}...")
-            s = socket.create_connection((PROXY_ADDR, PROXY_PORT), timeout=5)
-            s.close()
-            print("SUCCESS: Connection to the proxy server established!")
-        except socket.timeout:
-            print("TIMEOUT ERROR: School firewall is likely blocking all traffic to this external proxy.")
-        except ConnectionRefusedError:
-            print("REFUSED ERROR: The external proxy server is up but is refusing the connection.")
-        except OSError as e:
-            print(f"OS ERROR: Could not connect. Is the firewall preventing the connection? ({e})")
-        
-        if product == 'canary':
-            owner = 'xenia-canary'
-            repo = 'xenia-canary-releases'
-        elif product == 'stable':
-            owner = 'xenia-project'
-            repo = 'release-builds-windows'
-        elif product == 'oldercanary':
-            owner = 'xenia-canary'
-            repo = 'xenia-canary' # older releases were kept at the xenia-canary repo
-        elif product == 'canary-dbexperiment':
-            owner = 'seven7000real'
-            repo = 'xenia-canary' # experimental dashboard changes
-        elif product == 'canary-netplay':
-            owner = 'AdrianCassar'
-            repo = 'xenia-canary' # older releases were kept at the xenia-canary repo
-        else:
-            print("Unknown product for fetching versions! Falling back to stable.")
-            print(product)
-            owner = 'xenia-project'
-            repo = 'release-builds-windows' # default to stable
-        try:
-            url = f'https://api.github.com/repos/{owner}/{repo}/releases'
-            response = requests.get(url, proxies=proxies, timeout=10)
-            response.raise_for_status()
-            if response.status_code == 200:
-                return response.json()
-        except requests.exceptions.Timeout:
-            messagebox.showerror('Error', f'Error: Timeout was reached when trying to switch versions')
-        except requests.exceptions.RequestException:
-            messagebox.showerror('Error', f'Connection Error: {e}')
-        except Exception as e:
-            messagebox.showerror('Error', f'Failed to fetch versions: {e}')
-        return []
+    def fetch_xenia_versions(product):  # FIXME: ISSUE, do NOT run this by default
+        if NETWORKING == True:
+            try:
+                print(f"Attempting connection to {PROXY_ADDR}:{PROXY_PORT}...")
+                s = socket.create_connection((PROXY_ADDR, PROXY_PORT), timeout=5)
+                s.close()
+                print("SUCCESS: Connection to the proxy server established!")
+            except socket.timeout:
+                print("TIMEOUT ERROR: School firewall is likely blocking all traffic to this external proxy.")
+            except ConnectionRefusedError:
+                print("REFUSED ERROR: The external proxy server is up but is refusing the connection.")
+            except OSError as e:
+                print(f"OS ERROR: Could not connect. Is the firewall preventing the connection? ({e})")
 
-    def populate_versions_tree():
+            if product == 'canary':
+                owner = 'xenia-canary'
+                repo = 'xenia-canary-releases'
+            elif product == 'stable':
+                owner = 'xenia-project'
+                repo = 'release-builds-windows'
+            elif product == 'oldercanary':
+                owner = 'xenia-canary'
+                repo = 'xenia-canary' # older releases were kept at the xenia-canary repo
+            elif product == 'canary-dbexperiment':
+                owner = 'seven7000real'
+                repo = 'xenia-canary' # experimental dashboard changes
+            elif product == 'canary-netplay':
+                owner = 'AdrianCassar'
+                repo = 'xenia-canary' # older releases were kept at the xenia-canary repo
+            else:
+                print("Unknown product for fetching versions! Falling back to stable.")
+                print(product)
+                owner = 'xenia-project'
+                repo = 'release-builds-windows' # default to stable
+            try:
+                url = f'https://api.github.com/repos/{owner}/{repo}/releases'
+                response = requests.get(url, timeout=10)
+                response.raise_for_status()
+                if response.status_code == 200:
+                    return response.json()
+            except requests.exceptions.Timeout:
+                messagebox.showerror('Error', f'Error: Timeout was reached when trying to switch versions')
+            except requests.exceptions.RequestException:
+                messagebox.showerror('Error', f'Connection Error: {e}')
+            except Exception as e:
+                messagebox.showerror('Error', f'Failed to fetch versions: {e}')
+            return []
+        else: 
+            messagebox.showwarning('Warning', f"Your Xenia Manager is running in Offline mode.\nThis is because a test to Github's API failed.\nSome online functionality may not be available.", default='ok')
+            return []
+        
+    def populate_versions_tree(): # FIXME: ISSUE, runs fetch_xenia_versions
         versions_tree.delete(*versions_tree.get_children())
         
         # Add Xenia Canary node
@@ -1179,7 +1211,7 @@ def open_manager_config():
             node_id = f"stable_{version}"
             versions_tree.insert(stable_node, 'end', node_id, text=f"{version} ({date})")
         
-    def show_version_info(event):
+    def show_version_info(event): # FIXME: ISSUE, runs fetch_xenia_versions
         item_id = versions_tree.selection()[0]
         if not versions_tree.parent(item_id):  # Skip root nodes
             return
@@ -1253,13 +1285,13 @@ def open_manager_config():
     btn_frame = ttk.Frame(update_frame)
     btn_frame.pack(fill='x', padx=8, pady=4)
 
-    ttk.Button(btn_frame, text="Refresh Versions", command=populate_versions_tree).pack(side='left', padx=4)
+    ttk.Button(btn_frame, text="Refresh Versions", command=populate_versions_tree).pack(side='left', padx=4)  # FIXME: ISSUE, runs fetch_xenia_versions, but this is fine.
     check_updates_xm = tk.BooleanVar(value=state.get('update', {}).get('check_update_on_launch_xm', False))
     chk = ttk.Checkbutton(btn_frame, text="Check for updates on launch", variable=check_updates_xm)
     chk.pack(side='right', padx=4)
 
     # Initial population
-    populate_versions_tree()
+    populate_versions_tree() # FIXME: ISSUE, runs fetch_xenia_versions
 
     emu_frame = ttk.Frame(nb)
     nb.add(emu_frame, text='Emulator')
@@ -1326,7 +1358,7 @@ def open_manager_config():
                 installed_list.insert(tk.END, f"  {path}")
             installed_list.insert(tk.END, '')
 
-    def detect_and_refresh():
+    def detect_and_refresh(): 
         detect_installed_emulators()
         refresh_installed_list()
 
@@ -1466,36 +1498,38 @@ def dashboard_installer():
     # --- 2. Fetch Dashboard List ---
     dashboards = {}
     url = "https://api.github.com/repos/misterwaztaken/xbox360-dashboard-collection/releases"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            releases = response.json()
-            for release in releases:
-                release_tag = release.get("tag_name", "unknown")
-                assets = release.get("assets", [])
-
-                for asset in assets:
-                    asset_name = asset["name"]
-                    if asset_name.endswith(".zip"):
-                        unique_id = f"[{release_tag}] {asset_name}" 
-                        dashboards[unique_id] = {
-                            "name": asset_name,
-                            "url": asset["browser_download_url"],
-                            "tag_name": release_tag
-                        }
-        else:
-            messagebox.showerror("Error", f"Failed to fetch dashboard list: HTTP {response.status_code}")
+    if NETWORKING == True:
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                releases = response.json()
+                for release in releases:
+                    release_tag = release.get("tag_name", "unknown")
+                    assets = release.get("assets", [])
+                    for asset in assets:
+                        asset_name = asset["name"]
+                        if asset_name.endswith(".zip"):
+                            unique_id = f"[{release_tag}] {asset_name}" 
+                            dashboards[unique_id] = {
+                                "name": asset_name,
+                                "url": asset["browser_download_url"],
+                                "tag_name": release_tag
+                            }
+            else:
+                messagebox.showerror("Error", f"Failed to fetch dashboard list: HTTP {response.status_code}")
+                top.destroy()
+                return
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to fetch dashboard list: {e}")
             top.destroy()
             return
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to fetch dashboard list: {e}")
+    else:
+        messagebox.showwarning('Warning', f"Your Xenia Manager is running in Offline mode.\nThis is because a test to Github's API failed.\nSome online functionality may not be available.", default='ok')
         top.destroy()
         return
 
     # --- 3. Populate Listbox ---
     for unique_id in dashboards.keys():
-        # 🌟 CRITICAL FIX: The listbox entry MUST be the dictionary key (unique_id)
-        # to ensure the lookup works in the download function.
         dashboard_listbox.insert(tk.END, unique_id) 
         
     dashboard_listbox.pack(fill='both', expand=True, padx=10, pady=10)
@@ -1696,7 +1730,7 @@ settings_menu.add_command(label="Configure Emulator...", command=configure_emula
 menubar.add_cascade(label="Settings", menu=settings_menu)
 
 help_menu = tk.Menu(menubar, tearoff=0)
-help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Xenia Manager\nVersion 0.2\n\nA simple manager for Xenia Xbox 360 emulator dashboards and games.\n\nDeveloped by kazwaztaken."))
+help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Xenia Manager\nVersion 0.3-testing\n\nA simple manager for Xenia Xbox 360 emulator dashboards and games.\n\nDeveloped by kazwaztaken."))
 menubar.add_cascade(label="Help", menu=help_menu)
 
 root.config(menu=menubar)
