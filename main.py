@@ -1596,7 +1596,7 @@ def dashboard_installer():
             dash_name = dash_info["name"]
             release_tag = dash_info["tag_name"]
             
-            # Update the status label (must be done safely in the main thread)
+            # Update the status label
             progress_top.after(0, lambda name=dash_name: progress_label.config(text=f"Downloading: {name}"))
             
             try:
@@ -1605,11 +1605,9 @@ def dashboard_installer():
                 if response.status_code == 200:
                     zip_data = response.content
                     with zipfile.ZipFile(io.BytesIO(zip_data)) as zip_ref:
-                        extract_path = os.path.join("dashboard", release_tag) 
-                        # Use parent_window.after(0, ...) to call a helper function 
-                        # to ensure ensure_dir is defined and safe, or trust your setup.
-                        
-                        # Assuming ensure_dir is safe/defined globally:
+                        extract_path = os.path.join("dashboard") # don't put it in another folder
+                        # extract_path = os.path.join("dashboard", release_tag) 
+
                         ensure_dir(extract_path)
                         zip_ref.extractall(extract_path)
                         
@@ -1622,8 +1620,6 @@ def dashboard_installer():
                     print(f"Failed to download dashboard {dash_name}: HTTP {response.status_code}")
             except Exception as e:
                 print(f"Error downloading dashboard {dash_name}: {e}")
-                
-        # --- Download Complete Cleanup (run in main thread) ---
         
         # Stop file progress bar
         file_progress.stop()
@@ -1631,7 +1627,7 @@ def dashboard_installer():
         # Update final message and close the progress window
         progress_top.after(0, progress_top.destroy) 
         
-        # Show final message and destroy the original window (in main thread)
+        # Show final message and destroy the original window
         parent_window.after(0, lambda: messagebox.showinfo("Download Complete", f"Successfully installed {successful_downloads} dashboard(s)."))
         parent_window.after(0, parent_window.destroy) 
         
