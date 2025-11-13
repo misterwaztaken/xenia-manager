@@ -1160,11 +1160,15 @@ def open_manager_config():
                 messagebox.showerror('Error', f'Failed to fetch versions: {e}')
             return []
         else: 
-            messagebox.showwarning('Warning', f"Your Xenia Manager is running in Offline mode.\nThis is because a test to Github's API failed.\nSome online functionality may not be available.", default='ok')
             return []
         
     def populate_versions_tree(): # FIXME: ISSUE, runs fetch_xenia_versions
         versions_tree.delete(*versions_tree.get_children())
+        if NETWORKING == False:
+            versions_tree.insert('', 'end', text='Networking is disabled.', open=True)
+            versions_tree.insert('', 'end', text='Fix your firewall or any possible faults blocking Github API, then relaunch Xenia Manager.', open=True)
+            messagebox.showwarning('Warning', f"Your Xenia Manager is running in Offline mode.\nThis is because a test to Github's API failed.\nSome online functionality may not be available.", default='ok')
+            return
         
         # Add Xenia Canary node
         canary_node = versions_tree.insert('', 'end', text='Xenia Canary', open=True)
