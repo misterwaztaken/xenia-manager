@@ -36,9 +36,9 @@ Xenia Manager is a Python-based GUI manager for installing different versions of
 
 ### Planned features/bugfixes (should make these all issues lmao)
 - APPLICATION RELEASES WITH PYINSTALLER (i'm trying to get this working for portability, so bear with me!)
-- Fix issue with requests where app freezes if the internet sucks or is school wifi (you know where this is going)
+- Fix issue with requests where app freezes if the internet sucks or is school wifi (you know where this is going) #1
 - Fix issue where downloaded dashboards download to another folder under the
-main dashboard folder called "dashboards" (quite a handful, I know)
+main dashboard folder called "dashboards" (quite a handful, I know) #2
 - Add support for Linux, maybe MacOS **<-- BIG MAYBE™**
 - Add a cover art view for the Games tab
     - Figure out how to wrangle [IGDB](https://www.igdb.com/) and find title (game) names from the file itself to match a cover image to the ISO
