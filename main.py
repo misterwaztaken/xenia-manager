@@ -3,14 +3,12 @@
 # version 0.3-testing
 # please give credit if you intend to modify!
 
-# define proxy ip things (TODO: make this modifiable in settings later)
-PROXY_ADDR = '24.37.120.42'
-PROXY_PORT = '1080'
 TIMEOUT = 5
 
 import tkinter as tk
 from PIL import Image, ImageTk
 from tkinter import ttk, messagebox, filedialog, simpledialog, PhotoImage
+from ScrollableNotebook import *
 import os
 import shutil
 import threading
@@ -22,10 +20,143 @@ import sys
 import shutil
 import requests
 import pathlib
-import tomllib
+import tomlkit
+from tomlkit import TOMLDocument
 import ssl
 import socket
 import concurrent.futures
+
+SETTING_PRESETS = { # might make this a seperate file later, probably gonna get big
+    "APU": {
+        "apu": {
+            "friendly-name": "Audio API",
+            "options": ["any", "nop", "sdl", "xaudio2"],
+            "options-friendlyname": ["Auto", "Disable", "Simple DirectMedia Layer (SDL)", "XAudio2"]
+        },
+        "apu_max_queued_frames": {
+            "friendly-name": "Max Buffered Audio Frames"
+        },
+        "enable_xmp": {
+            "friendly-name": "Enable Music Player playback (XMP)",
+        }
+    },
+    # ---
+    "CPU": {
+        "cpu": {
+            "friendly-name": "CPU Backend",
+            "options": ["any", "x64"],
+            "options-friendlyname": ["Auto", "x64 (JIT)"]
+        },
+        "break_condition_op": {
+            "friendly-name": "Break Condition Operator",
+            "options": ["eq", "ne", "lt", "le", "gt", "ge"],
+            "options-friendlyname": ["Equal to", "Not equal to", "Less than", "Less than or equal to", "Greater than", "Greater than or equal to"]
+        }
+    },
+    # ---
+    "Display": {
+        "postprocess_antialiasing": {
+            "friendly-name": "Post-Process Anti-Aliasing",
+            "options": ["none", "fxaa", "fxaa_extreme"],
+            "options-friendlyname": ["None", "FXAA (Normal)", "FXAA (Extreme)"]
+        },
+        "postprocess_scaling_and_sharpening": {
+            "friendly-name": "Post-Process Scaling/Sharpening",
+            "options": ["bilinear", "cas", "fsr"],
+            "options-friendlyname": ["Bilinear (Simple)", "CAS (Sharpening)", "FSR (Upscaling)"]
+        }
+    },
+    # ---
+    "GPU": {
+        "gpu": {
+            "friendly-name": "Graphics API",
+            "options": ["any", "d3d12", "vulkan", "null"],
+            "options-friendlyname": ["Auto", "DirectX 12", "Vulkan", "None"]
+        },
+        "render_target_path_d3d12": {
+            "friendly-name": "D3D12 Render Target Path",
+            "options": ["any", "rtv", "rov"],
+            "options-friendlyname": ["Auto", "Host Render Targets (RTV)", "Rasterizer-Ordered Views (ROV)"]
+        },
+        "render_target_path_vulkan": {
+            "friendly-name": "Vulkan Render Target Path",
+            "options": ["any", "fbo", "fsi"],
+            "options-friendlyname": ["Auto", "Host Framebuffers (FBO)", "Fragment Shader Interlock (FSI)"]
+        }
+    },
+    # ---
+    "HID": {
+        "hid": {
+            "friendly-name": "Input API",
+            "options": ["any", "nop", "sdl", "winkey", "xinput"],
+            "options-friendlyname": ["Auto", "Disable", "Simple DirectMedia Layer (SDL)", "Keyboard (WinKey)", "XInput"]
+        },
+        "keyboard_mode": {
+            "friendly-name": "Keyboard Mode",
+            "options": ["0", "1", "2"],
+            "options-friendlyname": ["Disabled", "Enabled (Assigned)", "Passthrough"]
+        },
+        "keyboard_user_index": {
+            "friendly-name": "Keyboard Controller Port",
+            "options": ["0", "1", "2", "3"],
+            "options-friendlyname": ["Port 0", "Port 1", "Port 2", "Port 3"]
+        }
+    },
+    # ---
+    "Kernel": {
+        "kernel_display_gamma_type": {
+            "friendly-name": "Display Gamma Type",
+            "options": ["0", "1", "2", "3"],
+            "options-friendlyname": ["Linear", "sRGB (CRT)", "BT.709 (HDTV)", "Custom Power"]
+        }
+    },
+    # ---
+    "Logging": {
+        "log_level": {
+            "friendly-name": "Log Level",
+            "options": ["0", "1", "2", "3"],
+            "options-friendlyname": ["Error", "Warning", "Info", "Debug"]
+        }
+    },
+    # ---
+    "Storage": {
+        "storage_root": {
+            "friendly-name": "Storage Root Path",
+            "options": ["", "default"], # Added a dummy "default" friendly name for clarity
+            "options-friendlyname": ["Auto (OS Preferred)", "Auto (OS Preferred)"]
+        }
+    },
+    # ---
+    "Video": {
+        "video_standard": {
+            "friendly-name": "Video Standard",
+            "options": ["1", "2", "3"],
+            "options-friendlyname": ["NTSC", "NTSC-J", "PAL"]
+        }
+    },
+    "Win32": {
+        "enable_rdrand_ntdll_patch": {
+            "friendly-name": "Enable rdrand ntdll Patch"
+        }
+    },
+    # ---
+    "XConfig": {
+        "user_country": {
+            "friendly-name": "User Country ID",
+            "options": ["1", "35", "53", "103"],
+            "options-friendlyname": ["UAE", "Great Britain", "Japan", "United States"]
+        },
+        "user_language": {
+            "friendly-name": "User Language ID",
+            "options": ["1", "2", "5", "8"],
+            "options-friendlyname": ["English", "Japanese", "Spanish", "Chinese"]
+        }
+    }
+}
+
+
+
+
 
 print(ssl.get_default_verify_paths())
 print(ssl.OPENSSL_VERSION)
@@ -37,7 +168,7 @@ def github_test(timeout_duration=5):
     refine the code (basically shit is everywhere)
     """
     try:
-        response = requests.get("https://api.github.com/repos/python/cpython/releases")
+        response = requests.get("https://api.github.com/repos/python/cpython/releases") # funny test repo
         response.raise_for_status() # raise exception for bad error code
         releases = response.json()
         return f"success, fetched {len(releases)} release(s)"
@@ -46,79 +177,42 @@ def github_test(timeout_duration=5):
     except requests.exceptions.RequestException as e:
         return f"error: An unexpected error occurred: {e}"
     except Exception as e:
-        # Handle other potential errors within the function
         return f"an unexpected error occurred: {e}"
 
-
-with concurrent.futures.ProcessPoolExecutor() as executor:
-    future = executor.submit(github_test)
-    try:
-        result = future.result(timeout=TIMEOUT)
-        print(f"test connect to github works")
-        NETWORKING = True # TODO: also make this user-editable manually via settings
-    except concurrent.futures.TimeoutError:
-        print(f"test connect to github FAIL after {TIMEOUT} secs")
-        NETWORKING = False
-    except Exception as e:
-        print(f"an exception occured: {e}")
-        NETWORKING = False
-    
 # Optional drag-and-drop support via tkinterdnd2 (recommended on Windows)
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
     HAVE_TKDN = True
 except Exception:
     HAVE_TKDN = False
-
-def get_proxies_dict():
-    """Constructs the dictionary required by the requests library"""
-    if not PROXY_ADDR or not PROXY_PORT:
-        return None
-
-    proxy_url = f"socks5://{PROXY_ADDR}:{PROXY_PORT}"
     
-    return {
-        'http': proxy_url,
-        'https': proxy_url,
-    }
-    
-
-# Define the utility function outside of update_xenia()
-def get_app_root_dir(): # this is important for the pyinstaller temp folder handling
+def get_app_root_dir(): 
     """Returns the directory where the main executable or script is located."""
     if getattr(sys, 'frozen', False):
-        # Running from PyInstaller .exe
         return os.path.dirname(sys.executable)
     else:
-        # Running from a normal Python script
         return os.path.dirname(os.path.abspath(__file__))
 
-# Define the absolute path for the 'temp' folder 
 APP_ROOT_DIR = get_app_root_dir()
-TEMP_DIR = os.path.join(APP_ROOT_DIR, "temp") # oray that this works
+TEMP_DIR = os.path.join(APP_ROOT_DIR, "temp")
 
-# helper function to get asset paths
 def get_asset_path(filename):
     """Generates the correct path to an asset, handling both development and PyInstaller modes."""
-    # Check if the code is running from a PyInstaller bundle
     if getattr(sys, 'frozen', False):
-        # The temporary directory where PyInstaller extracts files
         base_path = sys._MEIPASS
     else:
-        # Standard development mode
         base_path = os.path.dirname(os.path.abspath(__file__))
     
     return os.path.join(base_path, 'assets', filename)
 
 
-# File to store labels (placed in parent folder of the "Xbox 360 Dashboards" folder)
 def get_labels_path():
     dash_folder = os.path.abspath("dashboard")
     if os.path.exists(dash_folder):
         parent = os.path.dirname(dash_folder)
     else:
         parent = os.path.abspath(os.path.dirname(__file__))
-    return os.path.join(parent, "dashboard_labels.json")
+    return os.path.join(parent, "config.json")
 
 def refresh_trees():
     populate_dashboards_tree()
@@ -737,10 +831,10 @@ def uninstall_xenia(emulator, version=None):
             # We'll need to iterate through a known parent or use the logic from state['emulators']
             
             # Safer approach: Iterate through the state information to find paths to delete
-            current_installed = state.get('installed_emulators', {})
+            current_installed = state.get('installed_emulators', {}) # NOTE: funny
             paths_to_delete = []
             
-            for exe_path, installed_tag in current_installed.items():
+            for exe_path, installed_tag in current_installed.items(): 
                 # Heuristic: Check if the path belongs to this emulator type based on the name in the tag/path
                 # This logic is very brittle without knowing the exact structure. We rely on 'emulator' in the tag.
                 if base_name_pattern in installed_tag.lower() or base_name_pattern in exe_path.lower():
@@ -836,6 +930,321 @@ def uninstall_xenia(emulator, version=None):
         ttk.Button(popup, text="Close", command=popup.destroy).pack(pady=6)
         popup.update()
 
+def open_emulator_config():
+    """
+    Revised/new version of Emulator config window
+    """
+    emulators = state.get('emulators', {}) # NOTE: funny
+
+    def save_config(doc, config_vars, config_path, emu_config):
+        """
+        Updates the TOML document with new values and writes it to the file.
+        """
+    
+        # 1. Update the TOML document (doc) with values from the Tkinter variables (config_vars)
+        for section_name, setting_vars in config_vars.items():
+            if section_name in doc and isinstance(doc[section_name], tomlkit.items.Table):
+                for setting_key, tk_var in setting_vars.items():
+                    new_value = tk_var.get()
+
+                    # tomlkit handles type preservation, but we need to ensure the value
+                    # pulled from the Tkinter variable is the right Python type
+                    current_toml_value = doc[section_name].get(setting_key)
+
+                    if isinstance(current_toml_value, bool):
+                        # For booleans, the Checkbutton's variable (BooleanVar) already gives bool
+                        doc[section_name][setting_key] = new_value
+                    elif isinstance(current_toml_value, int):
+                        try:
+                            doc[section_name][setting_key] = int(new_value)
+                        except ValueError:
+                            print(f"WARN: Could not convert '{new_value}' to integer for {setting_key}")
+                            continue
+                    elif isinstance(current_toml_value, float):
+                        try:
+                            doc[section_name][setting_key] = float(new_value)
+                        except ValueError:
+                            print(f"WARN: Could not convert '{new_value}' to float for {setting_key}")
+                            continue
+                    else: # Default for strings
+                        doc[section_name][setting_key] = str(new_value)
+
+        # 2. Write the updated document back to the file
+        try:
+            with open(config_path, "w", encoding="utf-8") as f:
+                f.write(tomlkit.dumps(doc))
+
+            messagebox.showinfo("Success", "Configuration changes applied successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save configuration: {e}")
+            print(f"Error saving config: {e}")
+
+    def emulator_select():
+        def on_listbox_select(event):
+            """
+            Callback function to enable/disable the Ok button based on selection.
+            """
+            listbox_widget = event.widget
+            if listbox_widget.curselection():
+                ok_btn.config(state='normal')
+            else:
+                ok_btn.config(state='disabled')
+        
+        def on_ok_button_click():
+            """
+            Function to handle the ok button
+            """        
+            selection_index = listbox.curselection()[0]
+            selected_value = listbox.get(selection_index)
+            print(f"opening config window for Xenia {selected_value}")
+            selection.destroy()
+            emulator_config(selected_value)
+            
+        selection = tk.Toplevel() # create picker
+        selection.title(f"Select an emulator to configure")
+        selection.geometry("400x300")
+        
+        status_var = tk.StringVar(value="Select an installed emulator below to configure:")
+        
+        status_label = ttk.Label(selection, textvariable=status_var)
+        status_label.pack(padx=20, pady=(20, 6)) 
+        
+        listbox = tk.Listbox(selection, selectmode=tk.SINGLE, bd=2, relief='groove') 
+        listbox.pack(pady=1, expand=True)
+             
+        for exe_path, tag in emulators.items():
+            listbox.insert(tk.END, f"Xenia '{tag}' (path: '{exe_path}')")
+        
+        listbox.bind("<<ListboxSelect>>", on_listbox_select)
+        
+        btn_frame = tk.Frame(selection, bd=2, relief='groove')
+        btn_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=5, expand=True) 
+        
+        cancel_btn = tk.Button(btn_frame, text="Cancel", command=selection.destroy)
+        cancel_btn.pack(side=tk.LEFT, expand=True, padx=5)
+        
+        ok_btn = tk.Button(btn_frame, text="OK", state='disabled', command=on_ok_button_click)
+        ok_btn.pack(side=tk.RIGHT, expand=True, padx=5)
+        
+    def emulator_config(emulator):
+        emulator_info = []
+        emu_path = None
+        emu_tag = None
+        emulators = state.get('emulators', {}) # NOTE: funny
+        for exe_path, tag in emulators.items():
+            if f"Xenia '{tag}' (path: '{exe_path}')" == emulator:
+                emulator_info.append(tag)
+                emulator_info.append(exe_path)
+                emu_path = exe_path
+                emu_tag = tag
+                break 
+            
+        # add save, apply and cancel buttons here
+        # they should be at the bottom and outside of the notebook
+        # also create an Changes Applied Successfully/Fail popup for when they save
+
+        config_vars = {} 
+        config_path = None
+        canvas_map = {} 
+
+        # --- Store all canvas widgets here to access them later ---
+        if not emu_path:
+            messagebox.showerror("Error", f"Emulator '{emulator}' not found.")
+            return
+
+        # below is to remove the xenia exe from the path using rfind
+        index = emu_path.rfind("xenia")
+
+        emu_config = tk.Toplevel()
+        emu_config.title(f"Configure Xenia '{emu_tag}'")
+        emu_config.geometry("600x400")
+
+        cool = ScrollableNotebook(emu_config, wheelscroll=True, tabmenu=True) # type: ignore
+        cool.pack(fill="both", expand=True, padx=5, pady=(5, 0))
+
+        # FIX: Optimized on_mouse_wheel to only scroll the intended canvas.
+        def on_mouse_wheel(event):
+            widget = emu_config.winfo_containing(event.x_root, event.y_root)
+            canvas = None
+            current = widget
+
+            while current and str(current) != str(emu_config):
+                if current.winfo_class() == 'Canvas':
+                    canvas = current
+                    break
+                
+                parent_path = current.winfo_parent()
+                if not parent_path: 
+                    break
+                current = emu_config.nametowidget(parent_path)
+
+            if canvas:
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        emu_config.bind_all("<MouseWheel>", on_mouse_wheel)
+
+
+        if index != -1:
+            exe_dir = emu_path[:index]
+            emu_dir_files = os.listdir(exe_dir)
+
+            for item in emu_dir_files:
+                if item in ["xenia-canary.config.toml", "xenia.config.toml"]: # who the hell uses xenia stable
+                    config_path = os.path.join(exe_dir, item)
+                    if os.path.isfile(config_path):
+                        print(f"Config file found for select emulator: {item} at '{config_path}'")
+                        break
+                    
+            if config_path: # config_path is only defined in above loop, make sure it is defined
+                with open(config_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    doc = tomlkit.parse(content)
+
+                for name, data in doc.items():
+                    if isinstance(data, tomlkit.items.Table):
+
+                        # create main notebook tab frame
+                        tab_frame = ttk.Frame(cool)
+                        cool.add(tab_frame, text=name)
+
+                        # create canvas and scrollbar
+                        canvas = tk.Canvas(tab_frame, borderwidth=0, highlightthickness=0) # Added styling for clean look
+                        scrollbar = ttk.Scrollbar(tab_frame, orient="vertical", command=canvas.yview)
+                        canvas_map[str(tab_frame)] = canvas
+
+                        # this frame will hold setting stuffs
+                        frame1 = ttk.Frame(canvas)
+
+                        # FIX: Throttled scrollregion update to reduce lag.
+                        # This function is executed once all layout changes have finished.
+                        def update_scroll_region(e, canvas_widget=canvas):
+                            # Use .after(1) to defer the expensive bbox("all") call
+                            # until the GUI has settled, preventing lag and jitter.
+                            canvas_widget.after(1, lambda: canvas_widget.configure(
+                                scrollregion=canvas_widget.bbox("all")
+                            ))
+                        frame1.bind("<Configure>", update_scroll_region)
+
+                        # FIX: This function ensures the content frame (frame1) stretches horizontally 
+                        # with the canvas, eliminating the scrollbar jump/slide issue.
+                        def on_canvas_resize(event, canvas_widget=canvas):
+                            # Ensure the inner frame's width is always equal to the canvas's width
+                            canvas_widget.itemconfigure("frame", width=event.width)
+                        canvas.bind('<Configure>', on_canvas_resize) 
+
+                        canvas.create_window((0, 0), window=frame1, anchor="nw", tags="frame")
+                        canvas.configure(yscrollcommand=scrollbar.set)
+
+                        # pack canvas and scrollbar
+                        canvas.pack(side="left", fill="both", expand=True)
+                        scrollbar.pack(side="right", fill="y")
+
+                        # Store Tkinter variables for this section                         
+                        config_vars[name] = {}
+
+                        # --- Create Grid Frame for settings/values ---
+                        # Added padding to settings_frame to use up space
+                        settings_frame = ttk.Frame(frame1, padding="10") 
+                        settings_frame.pack(fill='both', expand=True)
+                        settings_frame.grid_columnconfigure(0, weight=1) # Label column expands
+                        settings_frame.grid_columnconfigure(1, weight=2) # Entry column expands
+
+                        row_idx = 0
+                        for setting, value in data.items():
+                            setting_definition = SETTING_PRESETS.get(name, {}).get(setting)
+                            # 1. Create Label for the setting name
+                            if setting_definition:
+                                friendly_setting = setting_definition.get("friendly-name")
+                                label = ttk.Label(settings_frame, text=f"{friendly_setting}", anchor="w")
+                                label.grid(row=row_idx, column=0, sticky='w', padx=5, pady=2)
+                            else:
+                                label = ttk.Label(settings_frame, text=f"{setting}", anchor="w")
+                                label.grid(row=row_idx, column=0, sticky='w', padx=5, pady=2)
+                            tk_var = None
+                            input_widget = None
+                            # check if the setting should be a dropdown
+                            
+                            
+                            if setting_definition:
+                                tech_options = setting_definition.get("options")
+                                friendly_options = setting_definition.get("options-friendlyname")
+                                friendly_setting = setting_definition.get("friendly-name") # redefined here because i can and i will
+                                
+                                
+                            if setting_definition and friendly_options and friendly_setting and tech_options and len(tech_options) and len(friendly_options):
+                                if tech_options and friendly_options and len(tech_options) and len(friendly_options):
+                                    current_value = str(value)
+                                    try:
+                                        idx = tech_options.index(current_value)
+                                        initial_display_value = friendly_options[idx]
+                                    except ValueError:
+                                        initial_display_value = current_value
+
+                                    # --- USE COMBOBOX (DROPDOWN) ---
+                                    tk_var = tk.StringVar(value=initial_display_value)
+                                    input_widget = ttk.Combobox(
+                                        settings_frame, 
+                                        textvariable=tk_var, 
+                                        values=friendly_options, 
+                                        state="readonly" # Prevent users from typing invalid values
+                                    )
+                                    input_widget.grid(row=row_idx, column=1, sticky='ew', padx=5, pady=2)
+
+                                else:
+                                    tk_var = tk.StringVar(value=str(value))
+                                    input_widget = ttk.Entry(settings_frame, textvariable=tk_var)
+                                    input_widget.grid(row=row_idx, column=1, sticky="ew", padx=5, pady=2)
+                            elif isinstance(value, bool):
+                                tk_var = tk.BooleanVar(value=value)
+                                input_widget = ttk.Checkbutton(settings_frame, variable=tk_var, text="")
+                                input_widget.grid(row=row_idx, column=1, sticky='w', padx=5, pady=2)
+
+                            elif isinstance(value, (str, int, float)):
+                                tk_var = tk.StringVar(value=str(value))
+                                input_widget = ttk.Entry(settings_frame, textvariable=tk_var)
+                                input_widget.grid(row=row_idx, column=1, sticky='ew', padx=5, pady=2)
+
+                            else:
+                                # Fallback for complex types (e.g., arrays, nested tables) - display as text
+                                ttk.Label(settings_frame, text=str(value)).grid(row=row_idx, column=1, sticky='w', padx=5, pady=2)
+
+                            # 3. Store the Tkinter variable if an editable widget was created
+                            if tk_var:
+                                config_vars[name][setting] = tk_var
+
+                            row_idx += 1
+
+                # Moved button creation and event generation OUT of the TOML config loop
+                button_frame = ttk.Frame(emu_config)
+                button_frame.pack(fill='x', pady=10, padx=10)
+
+                # Cancel Button
+                cancel_btn = ttk.Button(button_frame, text="Cancel", command=emu_config.destroy)
+                cancel_btn.pack(side="right", padx=5)
+
+                # Save/Apply Button - calls the save_config function
+                if config_path:
+                    save_btn = ttk.Button(
+                        button_frame, 
+                        text="Save", 
+                        command=lambda: save_config(doc, config_vars, config_path, emu_config)
+                    )
+                    save_btn.pack(side="right", padx=5)
+
+                cool.event_generate("<<NotebookTabChanged>>")
+
+            else: 
+                # Could not read config_path
+                print("WARN: Config file path was found but could not be read or parsed.")
+
+        else: 
+            # could not parse the xenia exe, maybe it's a directory for some reason?
+            print("WARN: Could not parse exe file from exe path to get file dir, is this a path?")
+
+
+    emulator_select()        
+
+        
 def add_game():
     name = simpledialog.askstring("New Game", "Enter folder name for new game:")
     if not name:
@@ -1114,18 +1523,6 @@ def open_manager_config():
         
     def fetch_xenia_versions(product):  # FIXME: ISSUE, do NOT run this by default
         if NETWORKING == True:
-            try:
-                print(f"Attempting connection to {PROXY_ADDR}:{PROXY_PORT}...")
-                s = socket.create_connection((PROXY_ADDR, PROXY_PORT), timeout=5)
-                s.close()
-                print("SUCCESS: Connection to the proxy server established!")
-            except socket.timeout:
-                print("TIMEOUT ERROR: School firewall is likely blocking all traffic to this external proxy.")
-            except ConnectionRefusedError:
-                print("REFUSED ERROR: The external proxy server is up but is refusing the connection.")
-            except OSError as e:
-                print(f"OS ERROR: Could not connect. Is the firewall preventing the connection? ({e})")
-
             if product == 'canary':
                 owner = 'xenia-canary'
                 repo = 'xenia-canary-releases'
@@ -1162,7 +1559,7 @@ def open_manager_config():
         else: 
             return []
         
-    def populate_versions_tree(): # FIXME: ISSUE, runs fetch_xenia_versions
+    def populate_versions_tree():
         versions_tree.delete(*versions_tree.get_children())
         if NETWORKING == False:
             versions_tree.insert('', 'end', text='Networking is disabled.', open=True)
@@ -1215,7 +1612,7 @@ def open_manager_config():
             node_id = f"stable_{version}"
             versions_tree.insert(stable_node, 'end', node_id, text=f"{version} ({date})")
         
-    def show_version_info(event): # FIXME: ISSUE, runs fetch_xenia_versions
+    def show_version_info(event):
         item_id = versions_tree.selection()[0]
         if not versions_tree.parent(item_id):  # Skip root nodes
             return
@@ -1295,7 +1692,7 @@ def open_manager_config():
     chk.pack(side='right', padx=4)
 
     # Initial population
-    populate_versions_tree() # FIXME: ISSUE, runs fetch_xenia_versions
+    populate_versions_tree() 
 
     emu_frame = ttk.Frame(nb)
     nb.add(emu_frame, text='Emulator')
@@ -1726,7 +2123,7 @@ menubar.add_cascade(label="File", menu=file_menu)
 
 settings_menu = tk.Menu(menubar, tearoff=0)
 settings_menu.add_command(label="Configure Manager...", command=open_manager_config)
-settings_menu.add_command(label="Configure Emulator...", command=configure_emulator)
+settings_menu.add_command(label="Configure Emulator...", command=open_emulator_config) # configure_emulator is going to be replaced by this soon
 menubar.add_cascade(label="Settings", menu=settings_menu)
 
 help_menu = tk.Menu(menubar, tearoff=0)
@@ -1811,7 +2208,6 @@ def load_index():
         }
 
 
-# (Toolbar removed — use drag-and-drop or right-click Import functions)
 
 # Create notebook for tabs
 notebook = ttk.Notebook(root)
@@ -2134,24 +2530,34 @@ def on_double_click(event):
             is_open = tree.item(iid, 'open')
             tree.item(iid, open=not is_open)
 
+if __name__ == '__main__':
+    # Initialize tree views
+    dash_tree.heading("#0", text="Dashboards")
+    games_tree.heading("#0", text="Games")
 
+    # Bind events for both trees
+    for tree in (dash_tree, games_tree):
+        tree.bind('<Button-3>', on_right_click)
+        tree.bind('<Double-Button-1>', on_double_click)
 
+    # Bind F5 to refresh
+    root.bind('<F5>', lambda e: refresh_trees())
 
+    # Initial population
+    populate_dashboards_tree()
+    populate_games_tree()
 
-# Initialize tree views
-dash_tree.heading("#0", text="Dashboards")
-games_tree.heading("#0", text="Games")
-
-# Bind events for both trees
-for tree in (dash_tree, games_tree):
-    tree.bind('<Button-3>', on_right_click)
-    tree.bind('<Double-Button-1>', on_double_click)
-
-# Bind F5 to refresh
-root.bind('<F5>', lambda e: refresh_trees())
-
-# Initial population
-populate_dashboards_tree()
-populate_games_tree()
-
-root.mainloop()
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        future = executor.submit(github_test)
+        try:
+            result = future.result(timeout=TIMEOUT)
+            print(f"test connect to github works")
+            NETWORKING = True # TODO: also make this user-editable manually via settings
+        except concurrent.futures.TimeoutError:
+            print(f"test connect to github FAIL after {TIMEOUT} secs")
+            NETWORKING = False
+        except Exception as e:
+            print(f"an exception occured: {e}")
+            NETWORKING = False
+    
+    root.mainloop()

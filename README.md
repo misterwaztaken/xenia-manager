@@ -1,7 +1,8 @@
-# Xenia Manager
+# Xenia Manager **Testing Branch**
 
 > [!IMPORTANT]
-> This is unfinished! Xenia Manager is a Work-In-Progress.
+> - This is unfinished! Xenia Manager is a Work-In-Progress.
+> - **This is the testing branch** and is likely less put-together than the main one. Use with caution!
 
 ### What is Xenia Manager?
 Xenia Manager is a Python-based GUI manager for installing different versions of Xenia and managing Xbox 360 games and dashboards
